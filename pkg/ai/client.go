@@ -14,10 +14,12 @@ import (
 
 // Client provides AI analysis capabilities using Claude Code CLI
 type Client struct {
-	claudePath    string
-	maxTurns      int
-	timeout       time.Duration
-	systemPrompt  string
+	claudePath     string
+	maxTurns       int
+	timeout        time.Duration
+	systemPrompt   string
+	circuitBreaker *CircuitBreaker
+	parser         *ResponseParser
 }
 
 // Config holds configuration for the AI client
@@ -43,11 +45,23 @@ func NewClient(config Config) *Client {
 		config.SystemPrompt = getDefaultSystemPrompt()
 	}
 
+	// Initialize circuit breaker for AI calls
+	circuitBreaker := NewCircuitBreaker(CircuitBreakerConfig{
+		MaxFailures:  3,  // Allow 3 failures before opening
+		Timeout:      5 * time.Minute, // Wait 5 minutes before retry
+		ResetTimeout: 30 * time.Second, // Stay in half-open for 30 seconds
+		OnStateChange: func(from, to CircuitState) {
+			klog.Infof("AI Circuit breaker state changed: %s -> %s", from, to)
+		},
+	})
+
 	return &Client{
-		claudePath:   config.ClaudePath,
-		maxTurns:     config.MaxTurns,
-		timeout:      config.Timeout,
-		systemPrompt: config.SystemPrompt,
+		claudePath:     config.ClaudePath,
+		maxTurns:       config.MaxTurns,
+		timeout:        config.Timeout,
+		systemPrompt:   config.SystemPrompt,
+		circuitBreaker: circuitBreaker,
+		parser:         NewResponseParser(),
 	}
 }
 
@@ -62,12 +76,18 @@ func (c *Client) Analyze(ctx context.Context, request AnalysisRequest) (*Analysi
 
 	klog.V(2).Infof("AI Analysis: Running Claude Code CLI analysis for type=%s", request.Type)
 
-	result, err := c.runClaude(ctx, prompt)
+	var result string
+	err = c.circuitBreaker.Execute(ctx, func(ctx context.Context) error {
+		var execErr error
+		result, execErr = c.runClaude(ctx, prompt)
+		return execErr
+	})
+	
 	if err != nil {
 		return nil, fmt.Errorf("claude analysis failed: %w", err)
 	}
 
-	response, err := c.parseResponse(result, request)
+	response, err := c.parser.ParseResponse(result, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
@@ -151,8 +171,19 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
+	// Validate Claude path for security
+	if err := c.validateClaudePath(); err != nil {
+		return "", fmt.Errorf("invalid claude path: %w", err)
+	}
+
+	// Sanitize prompt to prevent injection attacks
+	sanitizedPrompt := c.sanitizePrompt(prompt)
+	if len(sanitizedPrompt) > 100000 { // Reasonable limit
+		return "", fmt.Errorf("prompt too long: %d characters", len(sanitizedPrompt))
+	}
+
 	args := []string{
-		"-p", prompt,
+		"-p", sanitizedPrompt,
 		"--max-turns", fmt.Sprintf("%d", c.maxTurns),
 		"--system-prompt", c.systemPrompt,
 	}
@@ -163,13 +194,64 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	klog.V(3).Infof("Executing Claude CLI: %s %s", c.claudePath, strings.Join(args, " "))
+	klog.V(3).Infof("Executing Claude CLI with %d character prompt", len(sanitizedPrompt))
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("claude command failed: %w, stderr: %s", err, stderr.String())
 	}
 
 	return stdout.String(), nil
+}
+
+// validateClaudePath ensures the Claude CLI path is safe to execute
+func (c *Client) validateClaudePath() error {
+	// Only allow known safe paths for Claude CLI
+	allowedPaths := []string{
+		"claude",           // From PATH
+		"/usr/local/bin/claude",
+		"/opt/homebrew/bin/claude",
+	}
+	
+	for _, allowed := range allowedPaths {
+		if c.claudePath == allowed {
+			return nil
+		}
+	}
+	
+	// Check if it's an absolute path pointing to a 'claude' binary
+	if strings.HasPrefix(c.claudePath, "/") && strings.HasSuffix(c.claudePath, "/claude") {
+		return nil
+	}
+	
+	return fmt.Errorf("claude path not in allowlist: %s", c.claudePath)
+}
+
+// sanitizePrompt removes potentially dangerous content from prompts
+func (c *Client) sanitizePrompt(prompt string) string {
+	// Remove shell escape sequences and control characters
+	sanitized := strings.ReplaceAll(prompt, "\x00", "")
+	sanitized = strings.ReplaceAll(sanitized, "\x1b", "")
+	
+	// Remove potential command injection patterns
+	dangerous := []string{
+		"$(", "`", ";", "&", "|", ">", "<", "&&", "||",
+	}
+	
+	for _, pattern := range dangerous {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "")
+	}
+	
+	return sanitized
+}
+
+// GetCircuitBreakerStats returns circuit breaker statistics
+func (c *Client) GetCircuitBreakerStats() map[string]interface{} {
+	return c.circuitBreaker.GetStats()
+}
+
+// ResetCircuitBreaker manually resets the circuit breaker
+func (c *Client) ResetCircuitBreaker() {
+	c.circuitBreaker.Reset()
 }
 
 // buildPrompt constructs the AI prompt based on the analysis request
@@ -219,29 +301,7 @@ func (c *Client) buildPrompt(request AnalysisRequest) (string, error) {
 	return prompt.String(), nil
 }
 
-// parseResponse parses the Claude CLI response
-func (c *Client) parseResponse(result string, request AnalysisRequest) (*AnalysisResponse, error) {
-	// Claude CLI returns the response directly, not wrapped in a JSON structure
-	response := &AnalysisResponse{
-		Summary:         extractSummary(result),
-		Diagnosis:       extractDiagnosis(result),
-		Confidence:      extractConfidence(result),
-		Severity:        extractSeverity(result),
-		Recommendations: extractRecommendations(result),
-		Actions:         extractActions(result),
-		Context:         make(map[string]interface{}),
-	}
-
-	// Set defaults if extraction failed
-	if response.Confidence == 0 {
-		response.Confidence = 0.8
-	}
-	if response.Severity == "" {
-		response.Severity = SeverityMedium
-	}
-
-	return response, nil
-}
+// parseResponse is deprecated - replaced by ResponseParser
 
 // countCriticalIssues counts critical issues in cluster health
 func (c *Client) countCriticalIssues(clusterHealth *ClusterHealth) int {
@@ -280,144 +340,8 @@ Always provide responses in a structured format with:
 Focus on practical, implementable solutions that minimize downtime and prevent future incidents.`
 }
 
-// Helper functions to extract information from Claude's response
-func extractSummary(text string) string {
-	// Simple extraction - in production, use more sophisticated parsing
-	lines := strings.Split(text, "\n")
-	for _, line := range lines {
-		if strings.Contains(strings.ToLower(line), "summary") && len(line) > 20 {
-			parts := strings.Split(line, ":")
-			if len(parts) > 1 {
-				return strings.TrimSpace(strings.Join(parts[1:], ":"))
-			}
-		}
-	}
-	// Return first meaningful line if no summary found
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) > 20 && !strings.HasPrefix(line, "#") {
-			return line
-		}
-	}
-	return "AI analysis completed"
-}
-
-func extractDiagnosis(text string) string {
-	// Extract diagnosis section
-	if strings.Contains(text, "DIAGNOSIS:") {
-		parts := strings.Split(text, "DIAGNOSIS:")
-		if len(parts) > 1 {
-			diagnosis := strings.Split(parts[1], "\n\n")[0]
-			return strings.TrimSpace(diagnosis)
-		}
-	}
-	return text // Return full text if no specific diagnosis section
-}
-
-func extractConfidence(text string) float64 {
-	// Look for confidence indicators
-	text = strings.ToLower(text)
-	if strings.Contains(text, "high confidence") || strings.Contains(text, "very confident") {
-		return 0.9
-	}
-	if strings.Contains(text, "confident") {
-		return 0.8
-	}
-	if strings.Contains(text, "likely") {
-		return 0.7
-	}
-	if strings.Contains(text, "possible") || strings.Contains(text, "might") {
-		return 0.6
-	}
-	return 0.75 // Default confidence
-}
-
-func extractSeverity(text string) SeverityLevel {
-	text = strings.ToLower(text)
-	if strings.Contains(text, "critical") || strings.Contains(text, "urgent") {
-		return SeverityCritical
-	}
-	if strings.Contains(text, "high priority") || strings.Contains(text, "important") {
-		return SeverityHigh
-	}
-	if strings.Contains(text, "medium") || strings.Contains(text, "moderate") {
-		return SeverityMedium
-	}
-	if strings.Contains(text, "low") || strings.Contains(text, "minor") {
-		return SeverityLow
-	}
-	return SeverityMedium
-}
-
-func extractRecommendations(text string) []Recommendation {
-	recommendations := []Recommendation{}
-	
-	// Look for numbered recommendations or bullet points
-	lines := strings.Split(text, "\n")
-	priority := 1
-	
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if isRecommendationLine(line) {
-			rec := Recommendation{
-				Title:       extractRecommendationTitle(line),
-				Description: line,
-				Priority:    priority,
-				Category:    "general",
-				Impact:      "medium",
-				Effort:      "medium",
-			}
-			recommendations = append(recommendations, rec)
-			priority++
-		}
-	}
-	
-	return recommendations
-}
-
-func extractActions(text string) []SuggestedAction {
-	actions := []SuggestedAction{}
-	
-	// Look for kubectl commands or specific actions
-	lines := strings.Split(text, "\n")
-	actionID := 1
-	
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "kubectl ") {
-			action := SuggestedAction{
-				ID:               fmt.Sprintf("action-%d", actionID),
-				Type:             ActionTypeKubectl,
-				Title:            fmt.Sprintf("Execute kubectl command"),
-				Description:      line,
-				Command:          line,
-				IsAutomatic:      false,
-				RequiresApproval: true,
-			}
-			actions = append(actions, action)
-			actionID++
-		}
-	}
-	
-	return actions
-}
-
-func isRecommendationLine(line string) bool {
-	line = strings.ToLower(line)
-	return strings.Contains(line, "recommend") || 
-		   strings.Contains(line, "suggest") ||
-		   strings.Contains(line, "should") ||
-		   (len(line) > 20 && (strings.HasPrefix(line, "1.") || strings.HasPrefix(line, "2.") || strings.HasPrefix(line, "3.") || strings.HasPrefix(line, "- ")))
-}
-
-func extractRecommendationTitle(line string) string {
-	// Extract first part before any punctuation as title
-	words := strings.Fields(line)
-	if len(words) > 6 {
-		return strings.Join(words[:6], " ") + "..."
-	}
-	return line
-}
+// Legacy extraction functions - replaced by ResponseParser
+// These functions are deprecated and will be removed in future versions
 
 // Instruction templates for different analysis types
 func getDiagnosticInstructions() string {

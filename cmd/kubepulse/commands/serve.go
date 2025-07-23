@@ -144,7 +144,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			select {
 			case <-broadcastTicker.C:
 				health := engine.GetClusterHealth("default")
-				apiServer.BroadcastUpdate(health)
+				apiServer.BroadcastToClients(health)
 			case <-ctx.Done():
 				return
 			}

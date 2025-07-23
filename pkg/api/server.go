@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -17,11 +18,15 @@ import (
 
 // Server handles HTTP API requests
 type Server struct {
-	engine   *core.Engine
-	router   *mux.Router
-	server   *http.Server
-	upgrader websocket.Upgrader
-	clients  map[*websocket.Conn]bool
+	engine     *core.Engine
+	router     *mux.Router
+	server     *http.Server
+	upgrader   websocket.Upgrader
+	clients    map[*websocket.Conn]bool
+	clientsMu  sync.RWMutex
+	shutdown   chan struct{}
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 // spaHandler implements a single-page application handler
@@ -39,6 +44,7 @@ type Config struct {
 // NewServer creates a new API server
 func NewServer(config Config) *Server {
 	router := mux.NewRouter()
+	ctx, cancel := context.WithCancel(context.Background())
 	
 	server := &Server{
 		engine: config.Engine,
@@ -55,10 +61,17 @@ func NewServer(config Config) *Server {
 				return true // Allow all origins in development
 			},
 		},
-		clients: make(map[*websocket.Conn]bool),
+		clients:  make(map[*websocket.Conn]bool),
+		shutdown: make(chan struct{}),
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 	
 	server.setupRoutes()
+	
+	// Start WebSocket client cleanup routine
+	go server.cleanupClients()
+	
 	return server
 }
 
@@ -208,47 +221,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleWebSocket handles WebSocket connections for real-time updates
-func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		klog.Errorf("WebSocket upgrade failed: %v", err)
-		return
-	}
-	defer conn.Close()
-	
-	s.clients[conn] = true
-	klog.Info("New WebSocket client connected")
-	
-	// Send initial data
-	health := s.engine.GetClusterHealth("default")
-	if err := conn.WriteJSON(health); err != nil {
-		klog.Errorf("Failed to send initial data: %v", err)
-		delete(s.clients, conn)
-		return
-	}
-	
-	// Keep connection alive and handle disconnect
-	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			klog.Info("WebSocket client disconnected")
-			delete(s.clients, conn)
-			break
-		}
-	}
-}
-
-// BroadcastUpdate sends updates to all connected WebSocket clients
-func (s *Server) BroadcastUpdate(data interface{}) {
-	for client := range s.clients {
-		if err := client.WriteJSON(data); err != nil {
-			klog.Errorf("Failed to broadcast to client: %v", err)
-			client.Close()
-			delete(s.clients, client)
-		}
-	}
-}
+// Old WebSocket handler removed - replaced with improved version with proper cleanup
 
 // corsMiddleware adds CORS headers
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
@@ -355,4 +328,170 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	
 	// Otherwise, serve the file normally
 	h.handler.ServeHTTP(w, r)
+}
+
+// handleWebSocket handles WebSocket connections with proper cleanup
+func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		klog.Errorf("WebSocket upgrade failed: %v", err)
+		return
+	}
+
+	// Add client with thread safety
+	s.clientsMu.Lock()
+	s.clients[conn] = true
+	clientCount := len(s.clients)
+	s.clientsMu.Unlock()
+
+	klog.V(2).Infof("WebSocket client connected. Total clients: %d", clientCount)
+
+	// Set up connection cleanup
+	defer func() {
+		s.removeClient(conn)
+		conn.Close()
+	}()
+
+	// Set up ping/pong to detect dead connections
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
+	// Start ping routine
+	go s.pingClient(conn)
+
+	// Read messages from client (mainly for keeping connection alive)
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					klog.Errorf("WebSocket error: %v", err)
+				}
+				return
+			}
+		}
+	}
+}
+
+// removeClient safely removes a client from the map
+func (s *Server) removeClient(conn *websocket.Conn) {
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
+	
+	if _, exists := s.clients[conn]; exists {
+		delete(s.clients, conn)
+		klog.V(2).Infof("WebSocket client disconnected. Total clients: %d", len(s.clients))
+	}
+}
+
+// pingClient sends periodic ping messages to detect dead connections
+func (s *Server) pingClient(conn *websocket.Conn) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		case <-s.ctx.Done():
+			return
+		}
+	}
+}
+
+// cleanupClients periodically cleans up dead connections
+func (s *Server) cleanupClients() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.clientsMu.Lock()
+			var deadConnections []*websocket.Conn
+			
+			for conn := range s.clients {
+				// Try to ping the connection
+				conn.SetWriteDeadline(time.Now().Add(time.Second))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					deadConnections = append(deadConnections, conn)
+				}
+			}
+			
+			// Remove dead connections
+			for _, conn := range deadConnections {
+				delete(s.clients, conn)
+				conn.Close()
+			}
+			
+			if len(deadConnections) > 0 {
+				klog.V(2).Infof("Cleaned up %d dead WebSocket connections. Active: %d", 
+					len(deadConnections), len(s.clients))
+			}
+			s.clientsMu.Unlock()
+			
+		case <-s.ctx.Done():
+			return
+		}
+	}
+}
+
+// BroadcastToClients sends data to all connected WebSocket clients
+func (s *Server) BroadcastToClients(data interface{}) {
+	s.clientsMu.RLock()
+	defer s.clientsMu.RUnlock()
+	
+	if len(s.clients) == 0 {
+		return
+	}
+	
+	var deadConnections []*websocket.Conn
+	
+	for conn := range s.clients {
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := conn.WriteJSON(data); err != nil {
+			klog.V(3).Infof("Failed to send to WebSocket client: %v", err)
+			deadConnections = append(deadConnections, conn)
+		}
+	}
+	
+	// Clean up dead connections (but don't modify map during read lock)
+	if len(deadConnections) > 0 {
+		go func() {
+			for _, conn := range deadConnections {
+				s.removeClient(conn)
+				conn.Close()
+			}
+		}()
+	}
+}
+
+// Shutdown gracefully shuts down the server and cleans up WebSocket connections
+func (s *Server) Shutdown(ctx context.Context) error {
+	klog.Info("Shutting down API server...")
+	
+	// Signal shutdown to all goroutines
+	s.cancel()
+	
+	// Close all WebSocket connections
+	s.clientsMu.Lock()
+	for conn := range s.clients {
+		conn.WriteMessage(websocket.CloseMessage, 
+			websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server shutting down"))
+		conn.Close()
+	}
+	s.clients = make(map[*websocket.Conn]bool)
+	s.clientsMu.Unlock()
+	
+	// Shutdown HTTP server
+	return s.server.Shutdown(ctx)
 }

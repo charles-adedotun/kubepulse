@@ -30,6 +30,7 @@ type Engine struct {
 	anomalyEngine *ml.AnomalyDetector
 	sloTracker    *slo.Tracker
 	aiClient      *ai.Client
+	errorHandler  *ErrorHandler
 	
 	// New AI components
 	predictiveAnalyzer *ai.PredictiveAnalyzer
@@ -63,6 +64,13 @@ func NewEngine(config EngineConfig) *Engine {
 		alertManager.AddRule(rule)
 	}
 
+	// Initialize error handler with callback for critical errors
+	errorHandler := NewErrorHandler(1000, func(err EngineError) {
+		if err.IsCritical() {
+			klog.Errorf("Critical error in %s.%s: %s", err.Component, err.Operation, err.Message)
+		}
+	})
+
 	engine := &Engine{
 		client:        config.KubeClient,
 		checks:        make([]HealthCheck, 0),
@@ -75,6 +83,7 @@ func NewEngine(config EngineConfig) *Engine {
 		alertManager:  alertManager,
 		anomalyEngine: ml.NewAnomalyDetector(),
 		sloTracker:    slo.NewTracker(),
+		errorHandler:  errorHandler,
 	}
 
 	// Initialize AI client if enabled
@@ -166,6 +175,18 @@ func (e *Engine) runChecks() {
 				result.Status = HealthStatusUnknown
 				result.Error = err
 				result.Message = fmt.Sprintf("Check failed: %v", err)
+				
+				// Create structured error and handle it
+				engineErr := NewHealthCheckError(
+					hc.Name(),
+					"check",
+					fmt.Sprintf("Health check execution failed: %v", err),
+					err,
+				).WithContext("check_duration", result.Duration)
+				
+				if handleErr := e.errorHandler.Handle(engineErr); handleErr != nil {
+					klog.Errorf("Critical health check failure: %v", handleErr)
+				}
 			}
 
 			resultsChan <- result
