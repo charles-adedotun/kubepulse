@@ -21,7 +21,7 @@ import (
 // Server handles HTTP API requests
 type Server struct {
 	engine         *core.Engine
-	contextManager *k8s.ContextManager
+	contextManager k8s.ContextManagerInterface
 	router         *mux.Router
 	server         *http.Server
 	upgrader       websocket.Upgrader
@@ -45,7 +45,7 @@ type spaHandler struct {
 type Config struct {
 	Port           int
 	Engine         *core.Engine
-	ContextManager *k8s.ContextManager
+	ContextManager k8s.ContextManagerInterface
 	Host           string
 	CORSEnabled    bool
 	CORSOrigins    []string
@@ -408,6 +408,15 @@ func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 	}
 }
 
+// writeError writes an error response
+func (s *Server) writeError(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": message,
+	})
+}
+
 // ServeHTTP implements the http.Handler interface for SPA
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get the absolute path to prevent directory traversal
@@ -631,9 +640,8 @@ func (s *Server) handleSwitchContext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the new client
-	client, err := s.contextManager.GetCurrentClient()
-	if err != nil {
+	// Get the new client to verify it works
+	if _, err := s.contextManager.GetCurrentClient(); err != nil {
 		s.writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

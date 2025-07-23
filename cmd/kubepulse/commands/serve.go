@@ -70,7 +70,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Load configuration
 	var cfg *config.Config
-	var err error
 	
 	// Check if config file is specified
 	configFile := viper.GetString("config")

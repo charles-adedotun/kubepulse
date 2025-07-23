@@ -9,6 +9,7 @@
 /bin/
 /dist/
 /build/
+/kubepulse
 
 # Test binary, built with `go test -c`
 *.test

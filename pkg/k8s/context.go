@@ -1,9 +1,9 @@
 package k8s
 
 import (
-	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -129,9 +129,11 @@ func (cm *ContextManager) SwitchContext(contextName string) error {
 		return fmt.Errorf("context %s not found", contextName)
 	}
 
-	// Get or create client for the context
+	// Try to get or create client for the context
+	// We allow switching even if connection fails
 	if _, err := cm.getOrCreateClient(contextName); err != nil {
-		return fmt.Errorf("failed to create client for context %s: %w", contextName, err)
+		klog.Warningf("Failed to create client for context %s: %v", contextName, err)
+		// Still switch the context even if client creation fails
 	}
 
 	cm.currentContext = contextName
@@ -182,16 +184,16 @@ func (cm *ContextManager) getOrCreateClient(contextName string) (kubernetes.Inte
 		return nil, fmt.Errorf("failed to create rest config: %w", err)
 	}
 
+	// Set timeout for the client
+	restConfig.Timeout = 10 * time.Second
+
 	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
 	// Test the connection
-	ctx, cancel := context.WithTimeout(context.Background(), clientcmd.DefaultTimeout)
-	defer cancel()
-
-	_, err = client.ServerVersion()
+	_, err = client.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}
