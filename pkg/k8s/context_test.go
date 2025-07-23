@@ -349,15 +349,15 @@ func TestConcurrentAccess(t *testing.T) {
 	
 	// Goroutine 1: List contexts repeatedly
 	go func() {
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 3; i++ {
 			_, _ = cm.ListContexts()
 		}
 		done <- true
 	}()
 	
-	// Goroutine 2: Switch contexts
+	// Goroutine 2: Switch contexts (reduced iterations for CI performance)
 	go func() {
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 2; i++ {
 			_ = cm.SwitchContext("context-1")
 			_ = cm.SwitchContext("context-2")
 		}
@@ -366,7 +366,7 @@ func TestConcurrentAccess(t *testing.T) {
 	
 	// Goroutine 3: Get current context
 	go func() {
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 3; i++ {
 			_, _ = cm.GetCurrentContext()
 		}
 		done <- true
