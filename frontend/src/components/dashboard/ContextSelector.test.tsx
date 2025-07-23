@@ -1,9 +1,10 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { ContextSelector } from './ContextSelector'
 
 // Mock fetch
-global.fetch = vi.fn()
+const mockFetch = vi.fn() as vi.MockedFunction<typeof fetch>
+global.fetch = mockFetch
 
 describe('ContextSelector', () => {
   beforeEach(() => {
@@ -11,10 +12,10 @@ describe('ContextSelector', () => {
   })
 
   it('renders loading state initially', async () => {
-    ;(fetch as any).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ contexts: [] })
-    })
+    } as Response)
 
     render(<ContextSelector />)
     
@@ -32,10 +33,10 @@ describe('ContextSelector', () => {
       { name: 'context-2', cluster_name: 'cluster-2', namespace: 'production', current: false }
     ]
 
-    ;(fetch as any).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ contexts: mockContexts })
-    })
+    } as Response)
 
     render(<ContextSelector />)
 
@@ -52,18 +53,18 @@ describe('ContextSelector', () => {
 
     const onContextChange = vi.fn()
 
-    ;(fetch as any)
+    mockFetch
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ contexts: mockContexts })
-      })
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ 
           success: true, 
           context: { name: 'context-2', cluster_name: 'cluster-2', namespace: 'production' }
         })
-      })
+      } as Response)
 
     render(<ContextSelector onContextChange={onContextChange} />)
 
@@ -103,7 +104,7 @@ describe('ContextSelector', () => {
   it('handles fetch errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     
-    ;(fetch as any).mockRejectedValueOnce(new Error('Network error'))
+    mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
     render(<ContextSelector />)
 
@@ -120,10 +121,10 @@ describe('ContextSelector', () => {
       { name: 'context-2', cluster_name: 'cluster-2', namespace: 'production', current: false }
     ]
 
-    ;(fetch as any).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ contexts: mockContexts })
-    })
+    } as Response)
 
     render(<ContextSelector />)
 
@@ -138,11 +139,11 @@ describe('ContextSelector', () => {
       { name: 'context-2', cluster_name: 'cluster-2', namespace: 'production', current: false }
     ]
 
-    ;(fetch as any)
+    mockFetch
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ contexts: mockContexts })
-      })
+      } as Response)
       .mockImplementationOnce(() => new Promise(() => {})) // Never resolve to test loading state
 
     render(<ContextSelector />)

@@ -11,12 +11,12 @@ export interface Config {
     maxReconnectAttempts: number
     reconnectDelay: number
     theme: 'light' | 'dark' | 'system'
-  }
-  features: {
-    aiInsights: boolean
-    predictiveAnalytics: boolean
-    smartAlerts: boolean
-    nodeDetails: boolean
+    features: {
+      aiInsights: boolean
+      predictiveAnalytics: boolean
+      smartAlerts: boolean
+      nodeDetails: boolean
+    }
   }
 }
 
@@ -26,7 +26,7 @@ function getConfig(): Config {
   const env = import.meta.env || {}
   
   // Allow runtime configuration via window.__KUBEPULSE_CONFIG__
-  const runtimeConfig = (window as any).__KUBEPULSE_CONFIG__ || {}
+  const runtimeConfig = (window as Window & { __KUBEPULSE_CONFIG__?: { apiBaseUrl?: string; wsUrl?: string } }).__KUBEPULSE_CONFIG__ || {}
   
   // Base URL can be set via env var or detected from current location
   const apiBaseUrl = runtimeConfig.apiBaseUrl || 
@@ -52,12 +52,12 @@ function getConfig(): Config {
       maxReconnectAttempts: Number(env.VITE_MAX_RECONNECT_ATTEMPTS) || 5,
       reconnectDelay: Number(env.VITE_RECONNECT_DELAY) || 3000, // 3 seconds
       theme: (env.VITE_THEME as Config['ui']['theme']) || 'system',
-    },
-    features: {
-      aiInsights: env.VITE_FEATURE_AI_INSIGHTS !== 'false',
-      predictiveAnalytics: env.VITE_FEATURE_PREDICTIVE !== 'false',
-      smartAlerts: env.VITE_FEATURE_SMART_ALERTS !== 'false',
-      nodeDetails: env.VITE_FEATURE_NODE_DETAILS !== 'false',
+      features: {
+        aiInsights: env.VITE_FEATURE_AI_INSIGHTS !== 'false',
+        predictiveAnalytics: env.VITE_FEATURE_PREDICTIVE !== 'false',
+        smartAlerts: env.VITE_FEATURE_SMART_ALERTS !== 'false',
+        nodeDetails: env.VITE_FEATURE_NODE_DETAILS !== 'false',
+      },
     },
   }
 }

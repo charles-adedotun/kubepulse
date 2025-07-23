@@ -14,45 +14,82 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useState } from 'react'
 import { config } from '@/config'
 import { useRuntimeConfig } from '@/hooks/useRuntimeConfig'
+import type { ContextInfo } from '@/components/dashboard/ContextSelector'
+import type { EnhancedMetric } from '@/components/dashboard/EnhancedMetricsGrid'
+import type { DashboardData } from '@/hooks/useWebSocket'
+
+// Extended metric type with enhanced metadata
+interface ExtendedMetric extends EnhancedMetric {
+  labels?: Record<string, string>
+  timestamp?: string
+  type?: string
+  checkName?: string
+}
+
+// Node detail type
+interface NodeDetail {
+  name: string
+  ready: boolean
+  cpu_allocatable: number
+  cpu_percent: number
+  memory_allocatable: number
+  memory_percent: number
+}
+
+// Cluster statistics type
+interface ClusterStats {
+  totalNodes: number
+  healthyNodes: number
+  avgCpuUsage: number
+  avgMemoryUsage: number
+}
+
+// Score with extended properties
+interface ExtendedScore {
+  weighted: number
+  trend?: string
+  forecast?: string
+}
 
 function App() {
   // Load runtime configuration from server
   useRuntimeConfig()
   
-  const [currentContext, setCurrentContext] = useState<any>(null)
+  const [currentContext, setCurrentContext] = useState<ContextInfo | null>(null)
   const { data, connectionStatus } = useWebSocket()
   const { insights, loading: aiLoading, error: aiError } = useAIInsights()
   const [activeTab, setActiveTab] = useState('overview')
   useSystemTheme() // This hook handles applying dark class to document
 
-  const handleContextChange = (context: any) => {
+  const handleContextChange = (context: ContextInfo) => {
     setCurrentContext(context)
     // The websocket connection will automatically receive updates
     // for the new context from the server
   }
 
   // Extract metrics from all checks with enhanced metadata
-  const allMetrics = data?.checks?.flatMap(check => 
+  const allMetrics: ExtendedMetric[] = data?.checks?.flatMap(check => 
     check.metrics?.map(metric => ({
       name: metric.name,
       value: metric.value,
       unit: metric.unit,
-      labels: (metric as any).labels,
-      timestamp: (metric as any).timestamp,
-      type: (metric as any).type,
+      labels: (metric as ExtendedMetric).labels,
+      timestamp: (metric as ExtendedMetric).timestamp,
+      type: (metric as ExtendedMetric).type,
       checkName: check.name
     })) || []
   ) || []
 
   // Extract node details for enhanced visualization
-  const nodeDetails = (data?.checks?.find(check => check.name === 'node-health') as any)?.details?.nodes || []
+  const nodeHealthCheck = data?.checks?.find(check => check.name === 'node-health') as DashboardData['checks'][0] & { details?: { nodes: NodeDetail[] } }
+  const nodeDetails: NodeDetail[] = nodeHealthCheck?.details?.nodes || []
   
   // Calculate cluster summary stats
-  const clusterStats = {
+  const clusterStats: ClusterStats = {
     totalNodes: nodeDetails.length,
-    healthyNodes: nodeDetails.filter((node: any) => node.ready).length,
-    avgCpuUsage: nodeDetails.reduce((sum: number, node: any) => sum + (node.cpu_percent || 0), 0) / (nodeDetails.length || 1),
-    avgMemoryUsage: nodeDetails.reduce((sum: number, node: any) => sum + (node.memory_percent || 0), 0) / (nodeDetails.length || 1)
+    healthyNodes: nodeDetails.filter((node: NodeDetail) => node.ready).length,
+    avgCpuUsage: nodeDetails.reduce((sum: number, node: NodeDetail) => sum + (node.cpu_percent || 0), 0) / (nodeDetails.length || 1),
+    avgMemoryUsage: nodeDetails.reduce((sum: number, node: NodeDetail) => sum + (node.memory_percent || 0), 0) / (nodeDetails.length || 1)
   }
 
   return (
@@ -84,7 +121,7 @@ function App() {
           <StatusCard
             title="Health Score"
             value={data?.score ? `${Math.round(data.score.weighted)}%` : '--'}
-            description={`Trend: ${(data?.score as any)?.trend || 'Unknown'} | Forecast: ${(data?.score as any)?.forecast || 'Unknown'}`}
+            description={`Trend: ${(data?.score as ExtendedScore)?.trend || 'Unknown'} | Forecast: ${(data?.score as ExtendedScore)?.forecast || 'Unknown'}`}
             status="healthy"
           />
           <StatusCard
@@ -93,7 +130,7 @@ function App() {
             description={`Nodes Ready | Avg CPU: ${Math.round(clusterStats.avgCpuUsage)}%`}
             status="healthy"
           />
-          {config.features.aiInsights && (
+          {config.ui.features.aiInsights && (
             <StatusCard
               title="AI Confidence"
               value={insights ? `${Math.round((insights.ai_confidence || 0) * 100)}%` : '--'}
@@ -105,15 +142,15 @@ function App() {
 
         {/* Main Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full grid-cols-${1 + (config.features.nodeDetails ? 1 : 0) + (config.features.aiInsights ? 1 : 0) + (config.features.predictiveAnalytics ? 1 : 0)}`}>
+          <TabsList className={`grid w-full grid-cols-${1 + (config.ui.features.nodeDetails ? 1 : 0) + (config.ui.features.aiInsights ? 1 : 0) + (config.ui.features.predictiveAnalytics ? 1 : 0)}`}>
             <TabsTrigger value="overview" data-state={activeTab === 'overview' ? 'active' : ''}>Overview</TabsTrigger>
-            {config.features.nodeDetails && (
+            {config.ui.features.nodeDetails && (
               <TabsTrigger value="nodes" data-state={activeTab === 'nodes' ? 'active' : ''}>Node Details</TabsTrigger>
             )}
-            {config.features.aiInsights && (
+            {config.ui.features.aiInsights && (
               <TabsTrigger value="ai-insights" data-state={activeTab === 'ai-insights' ? 'active' : ''}>AI Insights</TabsTrigger>
             )}
-            {config.features.predictiveAnalytics && (
+            {config.ui.features.predictiveAnalytics && (
               <TabsTrigger value="predictions" data-state={activeTab === 'predictions' ? 'active' : ''}>Predictions</TabsTrigger>
             )}
           </TabsList>
@@ -125,8 +162,8 @@ function App() {
                 name: check.name,
                 status: check.status,
                 message: check.message,
-                timestamp: (check as any).timestamp,
-                duration: (check as any).duration
+                timestamp: (check as DashboardData['checks'][0] & { timestamp?: string }).timestamp,
+                duration: (check as DashboardData['checks'][0] & { duration?: number }).duration
               })) || []}
             />
 
@@ -137,7 +174,7 @@ function App() {
             />
           </TabsContent>
 
-          {config.features.nodeDetails && (
+          {config.ui.features.nodeDetails && (
             <TabsContent value="nodes" className="space-y-6">
               <NodeDetailsPanel 
                 nodes={nodeDetails}
@@ -146,7 +183,7 @@ function App() {
             </TabsContent>
           )}
 
-          {config.features.aiInsights && (
+          {config.ui.features.aiInsights && (
             <TabsContent value="ai-insights" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <AIInsights 
@@ -154,16 +191,16 @@ function App() {
                   loading={aiLoading}
                   error={aiError || undefined}
                 />
-                {config.features.smartAlerts && <SmartAlerts />}
+                {config.ui.features.smartAlerts && <SmartAlerts />}
               </div>
             </TabsContent>
           )}
 
-          {config.features.predictiveAnalytics && (
+          {config.ui.features.predictiveAnalytics && (
             <TabsContent value="predictions" className="space-y-6">
               <PredictiveAnalytics 
-                clusterHealth={data}
-                insights={insights}
+                clusterHealth={data || undefined}
+                insights={insights || undefined}
               />
             </TabsContent>
           )}

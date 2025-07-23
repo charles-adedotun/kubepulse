@@ -29,8 +29,33 @@ interface PredictionData {
 }
 
 interface PredictiveAnalyticsProps {
-  clusterHealth?: any
-  insights?: any
+  clusterHealth?: {
+    score?: {
+      weighted: number
+      trend?: string
+      forecast?: string
+    }
+    status?: string
+    timestamp?: string
+    checks?: Array<{
+      name: string
+      status: string
+      message: string
+    }>
+  }
+  insights?: {
+    ai_confidence?: number
+    critical_issues?: number
+    overall_health?: string
+    trend_analysis?: string
+    predicted_issues?: string[]
+    top_recommendations?: Array<{
+      title: string
+      description: string
+      impact?: string
+      effort?: string
+    }>
+  }
 }
 
 export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps) {
@@ -84,7 +109,7 @@ export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps)
           ],
           trend_analysis: {
             cpu_trend: 'stable',
-            memory_trend: clusterHealth?.score?.trend || 'stable',
+            memory_trend: (clusterHealth?.score?.trend as 'increasing' | 'decreasing' | 'stable') || 'stable',
             workload_trend: 'stable',
             forecast_accuracy: 0.82
           },

@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button"
 import { Moon, Sun } from "lucide-react"
 import { useSystemTheme } from "@/hooks/useSystemTheme"
 import { ContextSelector } from "@/components/dashboard/ContextSelector"
+import type { ContextInfo } from "@/components/dashboard/ContextSelector"
 
 interface HeaderProps {
   connectionStatus: "connected" | "disconnected" | "connecting"
-  onContextChange?: (context: any) => void
+  onContextChange?: (context: ContextInfo) => void
 }
 
 export function Header({ connectionStatus, onContextChange }: HeaderProps) {

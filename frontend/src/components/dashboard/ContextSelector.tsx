@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Check, ChevronsUpDown, Globe } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Check, Globe } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -13,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { config } from '@/config'
 
-interface ContextInfo {
+export interface ContextInfo {
   name: string
   cluster_name: string
   namespace: string
