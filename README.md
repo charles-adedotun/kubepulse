@@ -1,5 +1,12 @@
 # KubePulse
 
+[![Go CI](https://github.com/charles-adedotun/kubepulse/actions/workflows/go-ci.yml/badge.svg)](https://github.com/charles-adedotun/kubepulse/actions/workflows/go-ci.yml)
+[![Frontend CI](https://github.com/charles-adedotun/kubepulse/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/charles-adedotun/kubepulse/actions/workflows/frontend-ci.yml)
+[![Docker](https://github.com/charles-adedotun/kubepulse/actions/workflows/docker.yml/badge.svg)](https://github.com/charles-adedotun/kubepulse/actions/workflows/docker.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/charles-adedotun/kubepulse)](https://goreportcard.com/report/github.com/charles-adedotun/kubepulse)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/release/charles-adedotun/kubepulse.svg)](https://github.com/charles-adedotun/kubepulse/releases/latest)
+
 Intelligent Kubernetes health monitoring with AI-powered diagnostics, predictive analytics, and auto-remediation.
 
 ## Overview
@@ -41,7 +48,7 @@ KubePulse is a comprehensive, AI-powered Kubernetes health monitoring platform t
 
 ### Installation
 
-#### From Source
+#### From Source (Recommended)
 
 ```bash
 # Clone the repository
@@ -511,6 +518,17 @@ Comprehensive error handling with:
 - [ ] **Integration Ecosystem** - Slack, Teams, PagerDuty, Datadog integrations
 - [ ] **Advanced Analytics** - Cost optimization and capacity planning
 - [ ] **Compliance Reporting** - SOC2, PCI-DSS compliance dashboards
+
+## CI/CD
+
+KubePulse uses GitHub Actions for continuous integration and delivery:
+
+- **Go CI**: Runs tests, linting, and builds for Go code
+- **Frontend CI**: Runs tests, type checking, and builds for React/TypeScript
+- **Security Scanning**: Automated vulnerability scanning with Trivy
+- **Release Automation**: Automated releases with GoReleaser
+
+All pull requests must pass CI checks before merging.
 
 ## Contributing
 

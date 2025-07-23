@@ -1,0 +1,72 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+    - make frontend-build
+
+builds:
+  - id: kubepulse
+    main: ./cmd/kubepulse
+    binary: kubepulse
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/kubepulse/kubepulse/cmd/kubepulse/commands.Version={{.Version}}
+      - -X github.com/kubepulse/kubepulse/cmd/kubepulse/commands.GitCommit={{.Commit}}
+      - -X github.com/kubepulse/kubepulse/cmd/kubepulse/commands.BuildDate={{.Date}}
+
+archives:
+  - id: kubepulse
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - frontend/dist/**/*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+dockers:
+  - image_templates:
+      - "ghcr.io/charles-adedotun/kubepulse:{{ .Tag }}"
+      - "ghcr.io/charles-adedotun/kubepulse:v{{ .Major }}"
+      - "ghcr.io/charles-adedotun/kubepulse:v{{ .Major }}.{{ .Minor }}"
+      - "ghcr.io/charles-adedotun/kubepulse:latest"
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--platform=linux/amd64,linux/arm64"
