@@ -2,12 +2,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Moon, Sun } from "lucide-react"
 import { useSystemTheme } from "@/hooks/useSystemTheme"
+import { ContextSelector } from "@/components/dashboard/ContextSelector"
 
 interface HeaderProps {
   connectionStatus: "connected" | "disconnected" | "connecting"
+  onContextChange?: (context: any) => void
 }
 
-export function Header({ connectionStatus }: HeaderProps) {
+export function Header({ connectionStatus, onContextChange }: HeaderProps) {
   const { theme, toggleTheme } = useSystemTheme()
   const getStatusVariant = () => {
     switch (connectionStatus) {
@@ -44,6 +46,8 @@ export function Header({ connectionStatus }: HeaderProps) {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <ContextSelector onContextChange={onContextChange} />
+          <div className="w-px h-8 bg-primary-foreground/20" />
           <Button
             variant="ghost"
             size="icon"

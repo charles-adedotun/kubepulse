@@ -14,6 +14,7 @@ import (
 	"github.com/kubepulse/kubepulse/pkg/api"
 	"github.com/kubepulse/kubepulse/pkg/core"
 	"github.com/kubepulse/kubepulse/pkg/health"
+	"github.com/kubepulse/kubepulse/pkg/k8s"
 	"github.com/kubepulse/kubepulse/pkg/plugins"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -54,6 +55,19 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("kubernetes client not initialized")
 	}
 
+	// Create context manager
+	kubeconfigPath := viper.GetString("kubeconfig")
+	contextManager, err := k8s.NewContextManager(kubeconfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to create context manager: %w", err)
+	}
+
+	// Get current context name
+	currentContext := ""
+	if ctx, err := contextManager.GetCurrentContext(); err == nil {
+		currentContext = ctx.Name
+	}
+
 	// Load configuration
 	var cfg *config.Config
 	var err error
@@ -91,12 +105,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	engineConfig := core.EngineConfig{
-		KubeClient:  client,
-		Interval:    interval,
-		AlertChan:   alertChan,
-		MetricsChan: metricsChan,
-		EnableAI:    true,
-		AIConfig:    &aiConfig,
+		KubeClient:     client,
+		ContextName:    currentContext,
+		Interval:       interval,
+		AlertChan:      alertChan,
+		MetricsChan:    metricsChan,
+		EnableAI:       true,
+		AIConfig:       &aiConfig,
 	}
 	engine := core.NewEngine(engineConfig)
 
@@ -142,11 +157,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Create API server with configuration
 	serverConfig := api.Config{
-		Port:         cfg.Server.Port,
-		Engine:       engine,
-		Host:         cfg.Server.Host,
-		CORSEnabled:  cfg.Server.CORSEnabled,
-		CORSOrigins:  cfg.Server.CORSOrigins,
+		Port:           cfg.Server.Port,
+		Engine:         engine,
+		ContextManager: contextManager,
+		Host:           cfg.Server.Host,
+		CORSEnabled:    cfg.Server.CORSEnabled,
+		CORSOrigins:    cfg.Server.CORSOrigins,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 		UIConfig:     cfg.UI,

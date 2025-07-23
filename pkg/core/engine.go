@@ -18,6 +18,7 @@ import (
 // Engine is the core monitoring engine
 type Engine struct {
 	client        kubernetes.Interface
+	currentContext string // Track current context
 	checks        []HealthCheck
 	interval      time.Duration
 	results       map[string]CheckResult
@@ -41,12 +42,13 @@ type Engine struct {
 
 // EngineConfig holds configuration for the monitoring engine
 type EngineConfig struct {
-	KubeClient  kubernetes.Interface
-	Interval    time.Duration
-	AlertChan   chan Alert
-	MetricsChan chan Metric
-	EnableAI    bool
-	AIConfig    *ai.Config
+	KubeClient     kubernetes.Interface
+	ContextName    string // Name of the current context
+	Interval       time.Duration
+	AlertChan      chan Alert
+	MetricsChan    chan Metric
+	EnableAI       bool
+	AIConfig       *ai.Config
 }
 
 // NewEngine creates a new monitoring engine
@@ -72,18 +74,19 @@ func NewEngine(config EngineConfig) *Engine {
 	})
 
 	engine := &Engine{
-		client:        config.KubeClient,
-		checks:        make([]HealthCheck, 0),
-		interval:      config.Interval,
-		results:       make(map[string]CheckResult),
-		ctx:           ctx,
-		cancel:        cancel,
-		alertChan:     config.AlertChan,
-		metricsChan:   config.MetricsChan,
-		alertManager:  alertManager,
-		anomalyEngine: ml.NewAnomalyDetector(),
-		sloTracker:    slo.NewTracker(),
-		errorHandler:  errorHandler,
+		client:         config.KubeClient,
+		currentContext: config.ContextName,
+		checks:         make([]HealthCheck, 0),
+		interval:       config.Interval,
+		results:        make(map[string]CheckResult),
+		ctx:            ctx,
+		cancel:         cancel,
+		alertChan:      config.AlertChan,
+		metricsChan:    config.MetricsChan,
+		alertManager:   alertManager,
+		anomalyEngine:  ml.NewAnomalyDetector(),
+		sloTracker:     slo.NewTracker(),
+		errorHandler:   errorHandler,
 	}
 
 	// Initialize AI client if enabled
@@ -477,7 +480,7 @@ func (e *Engine) buildDiagnosticContext(result CheckResult) ai.DiagnosticContext
 
 	// Build context
 	context := ai.DiagnosticContext{
-		ClusterName:   "default", // TODO: Get from config
+		ClusterName:   e.currentContext,
 		ResourceType:  extractResourceType(result.Name),
 		ResourceName:  extractResourceName(result.Name),
 		ErrorLogs:     extractErrorLogs(result),
@@ -514,7 +517,7 @@ func (e *Engine) GetAIInsights() (*ai.InsightSummary, error) {
 		return nil, fmt.Errorf("AI client not enabled")
 	}
 
-	clusterHealth := e.GetClusterHealth("default")
+	clusterHealth := e.GetClusterHealth(e.currentContext)
 	aiClusterHealth := e.convertToAIClusterHealth(clusterHealth)
 	return e.aiClient.AnalyzeCluster(e.ctx, &aiClusterHealth)
 }
@@ -525,7 +528,7 @@ func (e *Engine) QueryAssistant(query string) (*ai.QueryResponse, error) {
 		return nil, fmt.Errorf("AI assistant not enabled")
 	}
 
-	clusterHealth := e.GetClusterHealth("default")
+	clusterHealth := e.GetClusterHealth(e.currentContext)
 	aiClusterHealth := e.convertToAIClusterHealth(clusterHealth)
 	return e.assistant.Query(e.ctx, query, &aiClusterHealth)
 }

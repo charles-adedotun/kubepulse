@@ -42,7 +42,16 @@ export function useWebSocket() {
       ws.onmessage = (event) => {
         try {
           const parsedData = JSON.parse(event.data)
-          setData(parsedData)
+          
+          // Handle context switch events
+          if (parsedData.type === 'context_switched') {
+            console.log('Context switched:', parsedData.context)
+            // Clear current data to show loading state
+            setData(null)
+          } else {
+            // Regular health data update
+            setData(parsedData)
+          }
         } catch (error) {
           console.error('Failed to parse WebSocket data:', error)
         }

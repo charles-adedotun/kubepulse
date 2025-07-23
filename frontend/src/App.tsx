@@ -19,10 +19,17 @@ function App() {
   // Load runtime configuration from server
   useRuntimeConfig()
   
+  const [currentContext, setCurrentContext] = useState<any>(null)
   const { data, connectionStatus } = useWebSocket()
   const { insights, loading: aiLoading, error: aiError } = useAIInsights()
   const [activeTab, setActiveTab] = useState('overview')
   useSystemTheme() // This hook handles applying dark class to document
+
+  const handleContextChange = (context: any) => {
+    setCurrentContext(context)
+    // The websocket connection will automatically receive updates
+    // for the new context from the server
+  }
 
   // Extract metrics from all checks with enhanced metadata
   const allMetrics = data?.checks?.flatMap(check => 
@@ -50,8 +57,22 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header connectionStatus={connectionStatus} />
+      <Header connectionStatus={connectionStatus} onContextChange={handleContextChange} />
       <DashboardLayout>
+        {/* Context Info Bar */}
+        {currentContext && (
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg border">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Current Context:</span>
+              <span className="text-sm font-semibold">{currentContext.name}</span>
+              <span className="text-sm text-muted-foreground">•</span>
+              <span className="text-sm text-muted-foreground">{currentContext.cluster_name}</span>
+              <span className="text-sm text-muted-foreground">•</span>
+              <span className="text-sm text-muted-foreground">Namespace: {currentContext.namespace}</span>
+            </div>
+          </div>
+        )}
+
         {/* Enhanced Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <StatusCard

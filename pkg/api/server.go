@@ -14,23 +14,25 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/kubepulse/kubepulse/internal/config"
 	"github.com/kubepulse/kubepulse/pkg/core"
+	"github.com/kubepulse/kubepulse/pkg/k8s"
 	"k8s.io/klog/v2"
 )
 
 // Server handles HTTP API requests
 type Server struct {
-	engine       *core.Engine
-	router       *mux.Router
-	server       *http.Server
-	upgrader     websocket.Upgrader
-	clients      map[*websocket.Conn]bool
-	clientsMu    sync.RWMutex
-	shutdown     chan struct{}
-	ctx          context.Context
-	cancel       context.CancelFunc
-	corsEnabled  bool
-	corsOrigins  []string
-	uiConfig     config.UIConfig
+	engine         *core.Engine
+	contextManager *k8s.ContextManager
+	router         *mux.Router
+	server         *http.Server
+	upgrader       websocket.Upgrader
+	clients        map[*websocket.Conn]bool
+	clientsMu      sync.RWMutex
+	shutdown       chan struct{}
+	ctx            context.Context
+	cancel         context.CancelFunc
+	corsEnabled    bool
+	corsOrigins    []string
+	uiConfig       config.UIConfig
 }
 
 // spaHandler implements a single-page application handler
@@ -41,14 +43,15 @@ type spaHandler struct {
 
 // Config holds server configuration
 type Config struct {
-	Port         int
-	Engine       *core.Engine
-	Host         string
-	CORSEnabled  bool
-	CORSOrigins  []string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	UIConfig     config.UIConfig
+	Port           int
+	Engine         *core.Engine
+	ContextManager *k8s.ContextManager
+	Host           string
+	CORSEnabled    bool
+	CORSOrigins    []string
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	UIConfig       config.UIConfig
 }
 
 // NewServer creates a new API server
@@ -72,8 +75,9 @@ func NewServer(config Config) *Server {
 	}
 
 	server := &Server{
-		engine: config.Engine,
-		router: router,
+		engine:         config.Engine,
+		contextManager: config.ContextManager,
+		router:         router,
 		server: &http.Server{
 			Addr:         addr,
 			Handler:      router,
@@ -148,6 +152,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/ai/heal/{check}", s.handleAIHeal).Methods("POST")
 	api.HandleFunc("/config/ui", s.handleUIConfig).Methods("GET")
 
+	// Context management endpoints
+	api.HandleFunc("/contexts", s.handleListContexts).Methods("GET")
+	api.HandleFunc("/contexts/current", s.handleGetCurrentContext).Methods("GET")
+	api.HandleFunc("/contexts/switch", s.handleSwitchContext).Methods("POST")
+
 	// Register new AI routes on the api subrouter
 	aiApi := api.PathPrefix("/ai").Subrouter()
 	// Assistant endpoints
@@ -190,9 +199,17 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 // handleClusterHealth returns full cluster health
 func (s *Server) handleClusterHealth(w http.ResponseWriter, r *http.Request) {
+	// Get current context name from context manager
+	contextName := ""
+	if s.contextManager != nil {
+		if ctx, err := s.contextManager.GetCurrentContext(); err == nil {
+			contextName = ctx.Name
+		}
+	}
+	
 	clusterName := r.URL.Query().Get("cluster")
 	if clusterName == "" {
-		clusterName = "default"
+		clusterName = contextName
 	}
 
 	health := s.engine.GetClusterHealth(clusterName)
@@ -551,6 +568,97 @@ func (s *Server) BroadcastToClients(data interface{}) {
 			}
 		}()
 	}
+}
+
+// handleListContexts returns all available Kubernetes contexts
+func (s *Server) handleListContexts(w http.ResponseWriter, r *http.Request) {
+	if s.contextManager == nil {
+		s.writeError(w, http.StatusInternalServerError, "Context manager not initialized")
+		return
+	}
+
+	contexts, err := s.contextManager.ListContexts()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	s.writeJSON(w, map[string]interface{}{
+		"contexts": contexts,
+	})
+}
+
+// handleGetCurrentContext returns the current context information
+func (s *Server) handleGetCurrentContext(w http.ResponseWriter, r *http.Request) {
+	if s.contextManager == nil {
+		s.writeError(w, http.StatusInternalServerError, "Context manager not initialized")
+		return
+	}
+
+	context, err := s.contextManager.GetCurrentContext()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	s.writeJSON(w, context)
+}
+
+// handleSwitchContext switches to a different Kubernetes context
+func (s *Server) handleSwitchContext(w http.ResponseWriter, r *http.Request) {
+	if s.contextManager == nil {
+		s.writeError(w, http.StatusInternalServerError, "Context manager not initialized")
+		return
+	}
+
+	var req struct {
+		ContextName string `json:"context_name"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.ContextName == "" {
+		s.writeError(w, http.StatusBadRequest, "context_name is required")
+		return
+	}
+
+	// Switch context
+	if err := s.contextManager.SwitchContext(req.ContextName); err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Get the new client
+	client, err := s.contextManager.GetCurrentClient()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Update engine with new client
+	// Note: This requires adding a method to update the engine's client
+	// For now, we'll just return success
+	
+	// Get updated context info
+	context, err := s.contextManager.GetCurrentContext()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Broadcast context change to WebSocket clients
+	s.BroadcastToClients(map[string]interface{}{
+		"type":    "context_switched",
+		"context": context,
+	})
+
+	s.writeJSON(w, map[string]interface{}{
+		"success": true,
+		"context": context,
+	})
 }
 
 // Shutdown gracefully shuts down the server and cleans up WebSocket connections

@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	cfgFile    string
-	kubeconfig string
-	k8sClient  kubernetes.Interface
+	cfgFile       string
+	kubeconfig    string
+	contextName   string
+	k8sClient     kubernetes.Interface
 )
 
 // rootCmd represents the base command
@@ -41,9 +42,13 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kubepulse.yaml)")
 	rootCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", "", "path to kubeconfig file")
+	rootCmd.PersistentFlags().StringVar(&contextName, "context", "", "kubernetes context to use")
 
 	// Bind flags to viper
 	if err := viper.BindPFlag("kubeconfig", rootCmd.PersistentFlags().Lookup("kubeconfig")); err != nil {
+		fmt.Fprintf(os.Stderr, "Error binding flag: %v\n", err)
+	}
+	if err := viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("context")); err != nil {
 		fmt.Fprintf(os.Stderr, "Error binding flag: %v\n", err)
 	}
 }
@@ -94,8 +99,24 @@ func initK8sClient() {
 		}
 	}
 
-	// Build config from kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	// Build config with context override if specified
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.ExplicitPath = kubeconfigPath
+	
+	configOverrides := &clientcmd.ConfigOverrides{}
+	
+	// Use specified context if provided
+	selectedContext := viper.GetString("context")
+	if selectedContext != "" {
+		configOverrides.CurrentContext = selectedContext
+	}
+	
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		loadingRules,
+		configOverrides,
+	)
+	
+	config, err := clientConfig.ClientConfig()
 	if err != nil {
 		// Try in-cluster config
 		config, err = clientcmd.BuildConfigFromFlags("", "")

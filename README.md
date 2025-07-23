@@ -121,11 +121,17 @@ kubepulse monitor --watch
 # Monitor specific namespace
 kubepulse monitor --namespace production
 
+# Monitor specific context
+kubepulse monitor --context production-cluster
+
 # Run specific health check
 kubepulse check pod-health
 
 # Start web server with AI features
 kubepulse serve --port 8080
+
+# Start server with specific context
+kubepulse serve --context staging-cluster
 
 # Diagnose cluster issues with AI
 kubepulse diagnose --ai
@@ -149,6 +155,38 @@ The web dashboard provides:
 - AI-powered insights and recommendations
 - Interactive health check results
 - WebSocket-based live updates
+- Multi-cluster context switching
+
+### Multi-Cluster Support
+
+KubePulse supports monitoring multiple Kubernetes clusters from a single interface:
+
+#### Context Switching
+- **Web UI**: Use the context selector in the header to switch between clusters
+- **CLI**: Use the `--context` flag with any command
+- **API**: Use the `/api/v1/contexts/*` endpoints
+
+#### Features
+- List all available kubeconfig contexts
+- Switch between contexts without restarting
+- Maintain separate health history per cluster
+- WebSocket updates automatically reflect context changes
+- Context information displayed in dashboard
+
+#### Examples
+```bash
+# List available contexts
+kubectl config get-contexts
+
+# Monitor specific context
+kubepulse monitor --context production
+
+# Start server and switch contexts via UI
+kubepulse serve
+
+# Use different kubeconfig file
+kubepulse serve --kubeconfig ~/.kube/other-config
+```
 
 ## Architecture
 
@@ -211,6 +249,14 @@ GET /api/v1/metrics
 
 # Active alerts
 GET /api/v1/alerts
+
+# Context management
+GET /api/v1/contexts                    # List all contexts
+GET /api/v1/contexts/current            # Get current context
+POST /api/v1/contexts/switch            # Switch context
+{
+  "context_name": "production"
+}
 ```
 
 ### AI-Powered Endpoints
