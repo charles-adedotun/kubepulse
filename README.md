@@ -40,7 +40,7 @@ KubePulse is a comprehensive, AI-powered Kubernetes health monitoring platform t
 
 ### Prerequisites
 
-- **Go 1.24.4+** (for building from source)
+- **Go 1.23+** (for building from source)
 - **Kubernetes cluster** (v1.28+ recommended)
 - **kubectl** configured with cluster access
 - **Claude Code CLI** (for AI features) - Optional but recommended
