@@ -12,8 +12,13 @@ import { useAIInsights } from '@/hooks/useAIInsights'
 import { useSystemTheme } from '@/hooks/useSystemTheme'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useState } from 'react'
+import { config } from '@/config'
+import { useRuntimeConfig } from '@/hooks/useRuntimeConfig'
 
 function App() {
+  // Load runtime configuration from server
+  useRuntimeConfig()
+  
   const { data, connectionStatus } = useWebSocket()
   const { insights, loading: aiLoading, error: aiError } = useAIInsights()
   const [activeTab, setActiveTab] = useState('overview')
@@ -67,21 +72,29 @@ function App() {
             description={`Nodes Ready | Avg CPU: ${Math.round(clusterStats.avgCpuUsage)}%`}
             status="healthy"
           />
-          <StatusCard
-            title="AI Confidence"
-            value={insights ? `${Math.round((insights.ai_confidence || 0) * 100)}%` : '--'}
-            description={`Critical Issues: ${insights?.critical_issues || 0}`}
-            status={(insights?.critical_issues || 0) > 0 ? 'unhealthy' : 'healthy'}
-          />
+          {config.features.aiInsights && (
+            <StatusCard
+              title="AI Confidence"
+              value={insights ? `${Math.round((insights.ai_confidence || 0) * 100)}%` : '--'}
+              description={`Critical Issues: ${insights?.critical_issues || 0}`}
+              status={(insights?.critical_issues || 0) > 0 ? 'unhealthy' : 'healthy'}
+            />
+          )}
         </div>
 
         {/* Main Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={`grid w-full grid-cols-${1 + (config.features.nodeDetails ? 1 : 0) + (config.features.aiInsights ? 1 : 0) + (config.features.predictiveAnalytics ? 1 : 0)}`}>
             <TabsTrigger value="overview" data-state={activeTab === 'overview' ? 'active' : ''}>Overview</TabsTrigger>
-            <TabsTrigger value="nodes" data-state={activeTab === 'nodes' ? 'active' : ''}>Node Details</TabsTrigger>
-            <TabsTrigger value="ai-insights" data-state={activeTab === 'ai-insights' ? 'active' : ''}>AI Insights</TabsTrigger>
-            <TabsTrigger value="predictions" data-state={activeTab === 'predictions' ? 'active' : ''}>Predictions</TabsTrigger>
+            {config.features.nodeDetails && (
+              <TabsTrigger value="nodes" data-state={activeTab === 'nodes' ? 'active' : ''}>Node Details</TabsTrigger>
+            )}
+            {config.features.aiInsights && (
+              <TabsTrigger value="ai-insights" data-state={activeTab === 'ai-insights' ? 'active' : ''}>AI Insights</TabsTrigger>
+            )}
+            {config.features.predictiveAnalytics && (
+              <TabsTrigger value="predictions" data-state={activeTab === 'predictions' ? 'active' : ''}>Predictions</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -103,30 +116,36 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="nodes" className="space-y-6">
-            <NodeDetailsPanel 
-              nodes={nodeDetails}
-              metrics={allMetrics.filter(m => m.labels?.node)}
-            />
-          </TabsContent>
-
-          <TabsContent value="ai-insights" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <AIInsights 
-                insights={insights}
-                loading={aiLoading}
-                error={aiError || undefined}
+          {config.features.nodeDetails && (
+            <TabsContent value="nodes" className="space-y-6">
+              <NodeDetailsPanel 
+                nodes={nodeDetails}
+                metrics={allMetrics.filter(m => m.labels?.node)}
               />
-              <SmartAlerts />
-            </div>
-          </TabsContent>
+            </TabsContent>
+          )}
 
-          <TabsContent value="predictions" className="space-y-6">
-            <PredictiveAnalytics 
-              clusterHealth={data}
-              insights={insights}
-            />
-          </TabsContent>
+          {config.features.aiInsights && (
+            <TabsContent value="ai-insights" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <AIInsights 
+                  insights={insights}
+                  loading={aiLoading}
+                  error={aiError || undefined}
+                />
+                {config.features.smartAlerts && <SmartAlerts />}
+              </div>
+            </TabsContent>
+          )}
+
+          {config.features.predictiveAnalytics && (
+            <TabsContent value="predictions" className="space-y-6">
+              <PredictiveAnalytics 
+                clusterHealth={data}
+                insights={insights}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       </DashboardLayout>
     </div>

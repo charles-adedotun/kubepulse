@@ -1,0 +1,109 @@
+# KubePulse Configuration File
+# Copy this file to ~/.kubepulse.yaml and customize as needed
+
+# Kubernetes configuration
+kubernetes:
+  kubeconfig: ~/.kube/config
+  context: ""  # Use default context if empty
+  namespaces: []  # Monitor all namespaces if empty
+
+# Monitoring settings
+monitoring:
+  interval: 30s
+  enabled_checks:
+    - pod-health
+    - node-health
+    - service-health
+  max_history: 1000
+  timeout: 30s
+
+# AI Configuration
+ai:
+  enabled: true
+  claude_path: "claude"  # Path to Claude Code CLI
+  max_turns: 3
+  timeout: 120s
+
+# Server configuration
+server:
+  port: 8080
+  host: ""  # Bind to all interfaces
+  enable_web: true
+  cors_enabled: true
+  cors_origins:
+    - "*"  # Allow all origins, or specify specific origins
+  read_timeout: 15s
+  write_timeout: 15s
+
+# UI configuration
+ui:
+  refresh_interval: 10s
+  ai_insights_interval: 30s
+  max_reconnect_attempts: 5
+  reconnect_delay: 3s
+  theme: system  # light, dark, or system
+  features:
+    ai_insights: true
+    predictive_analytics: true
+    smart_alerts: true
+    node_details: true
+
+# Alert settings
+alerts:
+  enabled: true
+  channels:
+    log:
+      type: log
+      enabled: true
+    slack:
+      type: slack
+      enabled: false
+      settings:
+        webhook: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+    email:
+      type: email
+      enabled: false
+      settings:
+        smtp_server: smtp.example.com
+        smtp_port: 587
+        username: alerts@example.com
+        password: your-password
+        from: kubepulse@example.com
+        recipients:
+          - admin@example.com
+
+# SLO definitions
+slos:
+  api-availability:
+    description: API endpoints availability
+    sli: availability
+    target: 99.9
+    window: 30d
+    budget_policy:
+      - threshold: 0.1
+        action: alert
+      - threshold: 0.5
+        action: page
+
+# ML settings
+ml:
+  enabled: true
+  anomaly_engine: statistical
+  threshold: 2.0
+  learning_period: 24h
+  prediction_hours: 24
+
+# Health check specific configuration
+health_checks:
+  pod-health:
+    restart_threshold: 5
+    exclude_namespaces:
+      - kube-system
+      - kube-public
+  node-health:
+    check_pressure: true
+    memory_threshold: 85
+    disk_threshold: 90
+  service-health:
+    timeout: 5s
+    check_endpoints: true

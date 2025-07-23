@@ -12,21 +12,25 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/kubepulse/kubepulse/internal/config"
 	"github.com/kubepulse/kubepulse/pkg/core"
 	"k8s.io/klog/v2"
 )
 
 // Server handles HTTP API requests
 type Server struct {
-	engine    *core.Engine
-	router    *mux.Router
-	server    *http.Server
-	upgrader  websocket.Upgrader
-	clients   map[*websocket.Conn]bool
-	clientsMu sync.RWMutex
-	shutdown  chan struct{}
-	ctx       context.Context
-	cancel    context.CancelFunc
+	engine       *core.Engine
+	router       *mux.Router
+	server       *http.Server
+	upgrader     websocket.Upgrader
+	clients      map[*websocket.Conn]bool
+	clientsMu    sync.RWMutex
+	shutdown     chan struct{}
+	ctx          context.Context
+	cancel       context.CancelFunc
+	corsEnabled  bool
+	corsOrigins  []string
+	uiConfig     config.UIConfig
 }
 
 // spaHandler implements a single-page application handler
@@ -37,8 +41,14 @@ type spaHandler struct {
 
 // Config holds server configuration
 type Config struct {
-	Port   int
-	Engine *core.Engine
+	Port         int
+	Engine       *core.Engine
+	Host         string
+	CORSEnabled  bool
+	CORSOrigins  []string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	UIConfig     config.UIConfig
 }
 
 // NewServer creates a new API server
@@ -46,26 +56,57 @@ func NewServer(config Config) *Server {
 	router := mux.NewRouter()
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Use default timeouts if not specified
+	readTimeout := config.ReadTimeout
+	if readTimeout == 0 {
+		readTimeout = 15 * time.Second
+	}
+	writeTimeout := config.WriteTimeout
+	if writeTimeout == 0 {
+		writeTimeout = 15 * time.Second
+	}
+
+	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
+	if config.Host == "" {
+		addr = fmt.Sprintf(":%d", config.Port)
+	}
+
 	server := &Server{
 		engine: config.Engine,
 		router: router,
 		server: &http.Server{
-			Addr:         fmt.Sprintf(":%d", config.Port),
+			Addr:         addr,
 			Handler:      router,
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 15 * time.Second,
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
 			IdleTimeout:  60 * time.Second,
 		},
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true // Allow all origins in development
+				if !config.CORSEnabled {
+					return false
+				}
+				if len(config.CORSOrigins) == 0 || config.CORSOrigins[0] == "*" {
+					return true
+				}
+				// Check specific origins
+				origin := r.Header.Get("Origin")
+				for _, allowed := range config.CORSOrigins {
+					if origin == allowed {
+						return true
+					}
+				}
+				return false
 			},
 		},
-		clients:  make(map[*websocket.Conn]bool),
-		shutdown: make(chan struct{}),
-		ctx:      ctx,
-		cancel:   cancel,
-	}
+		clients:      make(map[*websocket.Conn]bool),
+		shutdown:     make(chan struct{}),
+		ctx:          ctx,
+		cancel:       cancel,
+		corsEnabled:  config.CORSEnabled,
+		corsOrigins:  config.CORSOrigins,
+		uiConfig:     config.UIConfig,
+}
 
 	server.setupRoutes()
 
@@ -105,6 +146,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/ai/insights", s.handleAIInsights).Methods("GET")
 	api.HandleFunc("/ai/analyze/{check}", s.handleAIAnalyze).Methods("POST")
 	api.HandleFunc("/ai/heal/{check}", s.handleAIHeal).Methods("POST")
+	api.HandleFunc("/config/ui", s.handleUIConfig).Methods("GET")
 
 	// Register new AI routes on the api subrouter
 	aiApi := api.PathPrefix("/ai").Subrouter()
@@ -226,9 +268,27 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 // corsMiddleware adds CORS headers
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if !s.corsEnabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Set CORS headers based on configuration
+		if len(s.corsOrigins) == 0 || s.corsOrigins[0] == "*" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			origin := r.Header.Get("Origin")
+			for _, allowed := range s.corsOrigins {
+				if origin == allowed {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					break
+				}
+			}
+		}
+		
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -303,6 +363,24 @@ func (s *Server) handleAIHeal(w http.ResponseWriter, r *http.Request) {
 		"status":  "not_analyzed",
 	}
 	s.writeJSON(w, response)
+}
+
+// handleUIConfig returns UI configuration
+func (s *Server) handleUIConfig(w http.ResponseWriter, r *http.Request) {
+	config := map[string]interface{}{
+		"refreshInterval":      s.uiConfig.RefreshInterval.Milliseconds(),
+		"aiInsightsInterval":   s.uiConfig.AIInsightsInterval.Milliseconds(),
+		"maxReconnectAttempts": s.uiConfig.MaxReconnectAttempts,
+		"reconnectDelay":       s.uiConfig.ReconnectDelay.Milliseconds(),
+		"theme":                s.uiConfig.Theme,
+		"features": map[string]bool{
+			"aiInsights":          s.uiConfig.Features.AIInsights,
+			"predictiveAnalytics": s.uiConfig.Features.PredictiveAnalytics,
+			"smartAlerts":         s.uiConfig.Features.SmartAlerts,
+			"nodeDetails":         s.uiConfig.Features.NodeDetails,
+		},
+	}
+	s.writeJSON(w, config)
 }
 
 // writeJSON writes JSON response

@@ -25,6 +25,12 @@ type Config struct {
 
 	// ML settings
 	ML MLConfig `yaml:"ml" mapstructure:"ml"`
+
+	// Server settings
+	Server ServerConfig `yaml:"server" mapstructure:"server"`
+
+	// UI settings
+	UI UIConfig `yaml:"ui" mapstructure:"ui"`
 }
 
 // KubernetesConfig holds Kubernetes-related configuration
@@ -89,6 +95,35 @@ type MLConfig struct {
 	PredictionHours int           `yaml:"prediction_hours" mapstructure:"prediction_hours"`
 }
 
+// ServerConfig holds server-related configuration
+type ServerConfig struct {
+	Port         int      `yaml:"port" mapstructure:"port"`
+	Host         string   `yaml:"host" mapstructure:"host"`
+	EnableWeb    bool     `yaml:"enable_web" mapstructure:"enable_web"`
+	CORSEnabled  bool     `yaml:"cors_enabled" mapstructure:"cors_enabled"`
+	CORSOrigins  []string `yaml:"cors_origins" mapstructure:"cors_origins"`
+	ReadTimeout  time.Duration `yaml:"read_timeout" mapstructure:"read_timeout"`
+	WriteTimeout time.Duration `yaml:"write_timeout" mapstructure:"write_timeout"`
+}
+
+// UIConfig holds UI-related configuration
+type UIConfig struct {
+	RefreshInterval      time.Duration `yaml:"refresh_interval" mapstructure:"refresh_interval"`
+	AIInsightsInterval   time.Duration `yaml:"ai_insights_interval" mapstructure:"ai_insights_interval"`
+	MaxReconnectAttempts int           `yaml:"max_reconnect_attempts" mapstructure:"max_reconnect_attempts"`
+	ReconnectDelay       time.Duration `yaml:"reconnect_delay" mapstructure:"reconnect_delay"`
+	Theme                string        `yaml:"theme" mapstructure:"theme"`
+	Features             UIFeatures    `yaml:"features" mapstructure:"features"`
+}
+
+// UIFeatures holds UI feature flags
+type UIFeatures struct {
+	AIInsights          bool `yaml:"ai_insights" mapstructure:"ai_insights"`
+	PredictiveAnalytics bool `yaml:"predictive_analytics" mapstructure:"predictive_analytics"`
+	SmartAlerts         bool `yaml:"smart_alerts" mapstructure:"smart_alerts"`
+	NodeDetails         bool `yaml:"node_details" mapstructure:"node_details"`
+}
+
 // LoadConfig loads configuration from file and environment
 func LoadConfig(configPath string) (*Config, error) {
 	// Set defaults
@@ -117,6 +152,28 @@ func LoadConfig(configPath string) (*Config, error) {
 			Threshold:       2.0,
 			LearningPeriod:  24 * time.Hour,
 			PredictionHours: 24,
+		},
+		Server: ServerConfig{
+			Port:         8080,
+			Host:         "",
+			EnableWeb:    true,
+			CORSEnabled:  true,
+			CORSOrigins:  []string{"*"},
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 15 * time.Second,
+		},
+		UI: UIConfig{
+			RefreshInterval:      10 * time.Second,
+			AIInsightsInterval:   30 * time.Second,
+			MaxReconnectAttempts: 5,
+			ReconnectDelay:       3 * time.Second,
+			Theme:                "system",
+			Features: UIFeatures{
+				AIInsights:          true,
+				PredictiveAnalytics: true,
+				SmartAlerts:         true,
+				NodeDetails:         true,
+			},
 		},
 	}
 
@@ -159,6 +216,12 @@ func loadFromEnv(config *Config) error {
 	_ = viper.BindEnv("kubernetes.kubeconfig", "KUBEPULSE_KUBECONFIG")
 	_ = viper.BindEnv("monitoring.interval", "KUBEPULSE_INTERVAL")
 	_ = viper.BindEnv("ml.enabled", "KUBEPULSE_ML_ENABLED")
+	_ = viper.BindEnv("server.port", "KUBEPULSE_PORT")
+	_ = viper.BindEnv("server.host", "KUBEPULSE_HOST")
+	_ = viper.BindEnv("server.enable_web", "KUBEPULSE_WEB_ENABLED")
+	_ = viper.BindEnv("server.cors_enabled", "KUBEPULSE_CORS_ENABLED")
+	_ = viper.BindEnv("ui.refresh_interval", "KUBEPULSE_UI_REFRESH")
+	_ = viper.BindEnv("ui.theme", "KUBEPULSE_UI_THEME")
 
 	// Override with environment values if set
 	if viper.IsSet("kubernetes.kubeconfig") {
@@ -169,6 +232,24 @@ func loadFromEnv(config *Config) error {
 	}
 	if viper.IsSet("ml.enabled") {
 		config.ML.Enabled = viper.GetBool("ml.enabled")
+	}
+	if viper.IsSet("server.port") {
+		config.Server.Port = viper.GetInt("server.port")
+	}
+	if viper.IsSet("server.host") {
+		config.Server.Host = viper.GetString("server.host")
+	}
+	if viper.IsSet("server.enable_web") {
+		config.Server.EnableWeb = viper.GetBool("server.enable_web")
+	}
+	if viper.IsSet("server.cors_enabled") {
+		config.Server.CORSEnabled = viper.GetBool("server.cors_enabled")
+	}
+	if viper.IsSet("ui.refresh_interval") {
+		config.UI.RefreshInterval = viper.GetDuration("ui.refresh_interval")
+	}
+	if viper.IsSet("ui.theme") {
+		config.UI.Theme = viper.GetString("ui.theme")
 	}
 
 	return nil

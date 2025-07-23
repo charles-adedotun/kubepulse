@@ -163,7 +163,38 @@ setup: deps
 	@echo "Installing development tools..."
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/tools/cmd/godoc@latest
+	@echo "Setting up configuration..."
+	@make config-init
 	@echo "Development environment ready!"
+
+# Configuration helpers
+.PHONY: config-init
+config-init:
+	@echo "Initializing configuration..."
+	@if [ ! -f ~/.kubepulse.yaml ]; then \
+		echo "Creating default configuration file..."; \
+		cp .kubepulse.yaml.example ~/.kubepulse.yaml; \
+		echo "Configuration created at ~/.kubepulse.yaml"; \
+		echo "Please edit this file to customize your settings"; \
+	else \
+		echo "Configuration already exists at ~/.kubepulse.yaml"; \
+	fi
+	@if [ ! -f frontend/.env ]; then \
+		echo "Creating frontend environment file..."; \
+		cp frontend/.env.example frontend/.env; \
+		echo "Frontend configuration created at frontend/.env"; \
+	fi
+
+.PHONY: config-show
+config-show:
+	@echo "Current configuration:"
+	@echo "====================="
+	@if [ -f ~/.kubepulse.yaml ]; then \
+		cat ~/.kubepulse.yaml; \
+	else \
+		echo "No configuration file found at ~/.kubepulse.yaml"; \
+		echo "Run 'make config-init' to create one"; \
+	fi
 
 .PHONY: help
 help:
@@ -184,6 +215,10 @@ help:
 	@echo "  setup          - Setup development environment"
 	@echo "  clean          - Clean build artifacts"
 	@echo "  help           - Show this help message"
+	@echo ""
+	@echo "Configuration targets:"
+	@echo "  config-init    - Initialize configuration files"
+	@echo "  config-show    - Display current configuration"
 	@echo ""
 	@echo "Frontend targets:"
 	@echo "  frontend-build - Build the React frontend"

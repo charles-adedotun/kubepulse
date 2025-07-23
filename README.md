@@ -302,64 +302,107 @@ func (c *CustomDNSCheck) Check(ctx context.Context, k8s kubernetes.Interface) (C
 
 ## Configuration
 
+KubePulse supports comprehensive configuration through multiple methods:
+1. **Configuration file** (`.kubepulse.yaml`)
+2. **Environment variables**
+3. **Command-line flags**
+4. **Runtime configuration** (UI settings from server)
+
 ### Configuration File
 
-Create a `.kubepulse.yaml` file in your home directory:
+Copy the example configuration to get started:
 
+```bash
+cp .kubepulse.yaml.example ~/.kubepulse.yaml
+```
+
+Key configuration sections:
+
+#### Server Configuration
 ```yaml
-# Kubernetes configuration
-kubeconfig: ~/.kube/config
+server:
+  port: 8080              # API server port
+  host: ""                # Bind address (empty = all interfaces)
+  enable_web: true        # Enable web dashboard
+  cors_enabled: true      # Enable CORS
+  cors_origins:
+    - "*"                 # Allowed origins (* = all)
+  read_timeout: 15s       # HTTP read timeout
+  write_timeout: 15s      # HTTP write timeout
+```
 
-# Monitoring settings
+#### UI Configuration
+```yaml
+ui:
+  refresh_interval: 10s        # Dashboard refresh rate
+  ai_insights_interval: 30s    # AI insights update interval
+  max_reconnect_attempts: 5    # WebSocket reconnection attempts
+  reconnect_delay: 3s          # Delay between reconnections
+  theme: system                # UI theme: light, dark, system
+  features:                    # Feature flags
+    ai_insights: true
+    predictive_analytics: true
+    smart_alerts: true
+    node_details: true
+```
+
+#### Monitoring Configuration
+```yaml
 monitoring:
   interval: 30s
   enabled_checks:
     - pod-health
     - node-health
     - service-health
+  max_history: 1000
+  timeout: 30s
+```
 
-# AI Configuration
+#### AI Configuration
+```yaml
 ai:
   enabled: true
   claude_path: "claude"  # Path to Claude Code CLI
   max_turns: 3
-  timeout: "120s"
-  
-# Web server configuration
-server:
-  port: 8080
-  enable_web: true
-  cors_enabled: true
-
-# Alert settings
-alerts:
-  channels:
-    - type: slack
-      webhook: https://hooks.slack.com/...
-    - type: email
-      smtp_server: smtp.example.com
-      recipients: ["admin@example.com"]
-
-# SLO definitions
-slos:
-  api-availability:
-    sli: availability
-    target: 99.9
-    window: 30d
-    
-# Health check specific configuration
-health_checks:
-  pod-health:
-    restart_threshold: 5
-    exclude_namespaces: ["kube-system", "kube-public"]
-  node-health:
-    check_pressure: true
-    memory_threshold: 85
-    disk_threshold: 90
+  timeout: 120s
 ```
 
 ### Environment Variables
 
+#### Server Environment Variables
+```bash
+# Server configuration
+KUBEPULSE_PORT=8080                    # Server port
+KUBEPULSE_HOST=0.0.0.0                 # Bind address
+KUBEPULSE_WEB_ENABLED=true             # Enable web UI
+KUBEPULSE_CORS_ENABLED=true            # Enable CORS
+
+# UI configuration
+KUBEPULSE_UI_REFRESH=10s               # UI refresh interval
+KUBEPULSE_UI_THEME=dark                # UI theme
+```
+
+#### Frontend Environment Variables
+```bash
+# Build-time configuration (Vite)
+VITE_API_BASE_URL=http://localhost:8080
+VITE_WS_URL=ws://localhost:8080/ws
+VITE_API_TIMEOUT=30000
+
+# UI intervals (milliseconds)
+VITE_REFRESH_INTERVAL=10000
+VITE_AI_INSIGHTS_INTERVAL=30000
+VITE_MAX_RECONNECT_ATTEMPTS=5
+VITE_RECONNECT_DELAY=3000
+
+# Feature flags
+VITE_FEATURE_AI_INSIGHTS=true
+VITE_FEATURE_PREDICTIVE=true
+VITE_FEATURE_SMART_ALERTS=true
+VITE_FEATURE_NODE_DETAILS=true
+```
+
+#### Kubernetes & Monitoring
 ```bash
 # Kubernetes configuration
 KUBECONFIG=/path/to/kubeconfig
@@ -369,13 +412,59 @@ KUBEPULSE_AI_ENABLED=true
 KUBEPULSE_CLAUDE_PATH=/usr/local/bin/claude
 KUBEPULSE_AI_TIMEOUT=120s
 
-# Server configuration
-KUBEPULSE_PORT=8080
-KUBEPULSE_WEB_ENABLED=true
-
 # Monitoring configuration
 KUBEPULSE_INTERVAL=30s
 KUBEPULSE_NAMESPACE=production
+```
+
+### Command-Line Flags
+
+Command-line flags override configuration file and environment variables:
+
+```bash
+# Server command with custom configuration
+kubepulse serve \
+  --port 9090 \
+  --interval 20s \
+  --config /custom/path/config.yaml
+
+# Monitor with specific settings
+kubepulse monitor \
+  --namespace production \
+  --interval 10s \
+  --checks pod-health,node-health
+```
+
+### Configuration Precedence
+
+Configuration is loaded in the following order (later sources override earlier):
+1. Default values
+2. Configuration file (`.kubepulse.yaml`)
+3. Environment variables
+4. Command-line flags
+5. Runtime configuration (for UI features)
+
+### Frontend Configuration
+
+The frontend can be configured at:
+1. **Build time** - Using Vite environment variables
+2. **Runtime** - Via server-provided configuration
+3. **Window object** - For dynamic configuration
+
+#### Runtime Configuration
+
+The frontend automatically fetches configuration from `/api/v1/config/ui` endpoint.
+
+#### Window Configuration
+
+```html
+<script>
+  // Configure before app loads
+  window.__KUBEPULSE_CONFIG__ = {
+    apiBaseUrl: 'https://api.example.com',
+    wsUrl: 'wss://api.example.com/ws'
+  };
+</script>
 ```
 
 ### Claude Code CLI Setup

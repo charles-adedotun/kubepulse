@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AIInsight } from '@/components/dashboard/AIInsights'
+import { config, apiUrl } from '@/config'
 
 export function useAIInsights() {
   const [insights, setInsights] = useState<AIInsight | null>(null)
@@ -10,7 +11,9 @@ export function useAIInsights() {
     const fetchInsights = async () => {
       try {
         setLoading(true)
-        const response = await fetch('/api/v1/ai/insights')
+        const response = await fetch(apiUrl('/api/v1/ai/insights'), {
+          signal: AbortSignal.timeout(config.api.timeout)
+        })
         
         if (!response.ok) {
           throw new Error('Failed to fetch AI insights')
@@ -30,8 +33,8 @@ export function useAIInsights() {
 
     fetchInsights()
     
-    // Refresh AI insights every 30 seconds
-    const interval = setInterval(fetchInsights, 30000)
+    // Refresh AI insights based on config
+    const interval = setInterval(fetchInsights, config.ui.aiInsightsInterval)
     
     return () => clearInterval(interval)
   }, [])

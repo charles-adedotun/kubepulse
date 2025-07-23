@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { config, wsUrl } from '@/config'
 
 export interface DashboardData {
   status: "healthy" | "degraded" | "unhealthy" | "unknown"
@@ -26,11 +27,10 @@ export function useWebSocket() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const connect = () => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws`
+    const websocketUrl = wsUrl()
 
     try {
-      const ws = new WebSocket(wsUrl)
+      const ws = new WebSocket(websocketUrl)
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -65,13 +65,13 @@ export function useWebSocket() {
   }
 
   const attemptReconnect = () => {
-    if (reconnectAttemptsRef.current < 5) {
+    if (reconnectAttemptsRef.current < config.ui.maxReconnectAttempts) {
       reconnectAttemptsRef.current++
-      console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/5)...`)
+      console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${config.ui.maxReconnectAttempts})...`)
       
       reconnectTimeoutRef.current = setTimeout(() => {
         connect()
-      }, 3000)
+      }, config.ui.reconnectDelay)
     }
   }
 

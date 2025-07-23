@@ -9,12 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kubepulse/kubepulse/internal/config"
 	"github.com/kubepulse/kubepulse/pkg/ai"
 	"github.com/kubepulse/kubepulse/pkg/api"
 	"github.com/kubepulse/kubepulse/pkg/core"
 	"github.com/kubepulse/kubepulse/pkg/health"
 	"github.com/kubepulse/kubepulse/pkg/plugins"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/klog/v2"
 )
 
@@ -50,6 +52,32 @@ func runServe(cmd *cobra.Command, args []string) error {
 	client := GetK8sClient()
 	if client == nil {
 		return fmt.Errorf("kubernetes client not initialized")
+	}
+
+	// Load configuration
+	var cfg *config.Config
+	var err error
+	
+	// Check if config file is specified
+	configFile := viper.GetString("config")
+	if configFile != "" {
+		cfg, err = config.LoadConfig(configFile)
+	} else {
+		cfg, err = config.LoadConfig("")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Override with command line flags if provided
+	if cmd.Flags().Changed("port") {
+		cfg.Server.Port = port
+	}
+	if cmd.Flags().Changed("web") {
+		cfg.Server.EnableWeb = webEnabled
+	}
+	if cmd.Flags().Changed("interval") {
+		cfg.Monitoring.Interval = interval
 	}
 
 	// Create channels for alerts and metrics
@@ -112,10 +140,16 @@ func runServe(cmd *cobra.Command, args []string) error {
 		engine.AddCheck(check)
 	}
 
-	// Create API server
+	// Create API server with configuration
 	serverConfig := api.Config{
-		Port:   port,
-		Engine: engine,
+		Port:         cfg.Server.Port,
+		Engine:       engine,
+		Host:         cfg.Server.Host,
+		CORSEnabled:  cfg.Server.CORSEnabled,
+		CORSOrigins:  cfg.Server.CORSOrigins,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+		UIConfig:     cfg.UI,
 	}
 	apiServer := api.NewServer(serverConfig)
 
@@ -147,7 +181,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		broadcastTicker := time.NewTicker(interval)
+		broadcastTicker := time.NewTicker(cfg.UI.RefreshInterval)
 		defer broadcastTicker.Stop()
 
 		for {
@@ -166,7 +200,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	go handleMetrics(metricsChan)
 
 	// Display startup information
-	displayStartupInfo(port, apiOnly, webEnabled)
+	displayStartupInfo(cfg)
 
 	// Handle shutdown signals
 	sigChan := make(chan os.Signal, 1)
@@ -206,24 +240,33 @@ func runServe(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func displayStartupInfo(port int, apiOnly, webEnabled bool) {
+func displayStartupInfo(cfg *config.Config) {
 	fmt.Printf("\n🚀 KubePulse Server Starting...\n")
 	fmt.Printf("┌─────────────────────────────────────────┐\n")
-	fmt.Printf("│  Port: %d                               │\n", port)
-	fmt.Printf("│  Mode: %s                          │\n", getServerMode(apiOnly, webEnabled))
-	fmt.Printf("│  Monitoring Interval: %s                │\n", interval.String())
+	fmt.Printf("│  Port: %d                               │\n", cfg.Server.Port)
+	fmt.Printf("│  Mode: %s                          │\n", getServerMode(!cfg.Server.EnableWeb, cfg.Server.EnableWeb))
+	fmt.Printf("│  Monitoring Interval: %s                │\n", cfg.Monitoring.Interval.String())
+	fmt.Printf("│  UI Refresh Interval: %s               │\n", cfg.UI.RefreshInterval.String())
+	fmt.Printf("│  CORS: %v                              │\n", cfg.Server.CORSEnabled)
 	fmt.Printf("└─────────────────────────────────────────┘\n\n")
 
-	fmt.Printf("📡 API Endpoints:\n")
-	fmt.Printf("   • Health Status:     http://localhost:%d/api/v1/health\n", port)
-	fmt.Printf("   • Cluster Health:    http://localhost:%d/api/v1/health/cluster\n", port)
-	fmt.Printf("   • Health Checks:     http://localhost:%d/api/v1/health/checks\n", port)
-	fmt.Printf("   • Prometheus Metrics: http://localhost:%d/api/v1/metrics\n", port)
+	// Display feature flags
+	fmt.Printf("📊 UI Features:\n")
+	fmt.Printf("   • AI Insights:           %v\n", cfg.UI.Features.AIInsights)
+	fmt.Printf("   • Predictive Analytics:  %v\n", cfg.UI.Features.PredictiveAnalytics)
+	fmt.Printf("   • Smart Alerts:          %v\n", cfg.UI.Features.SmartAlerts)
+	fmt.Printf("   • Node Details:          %v\n", cfg.UI.Features.NodeDetails)
 
-	if webEnabled && !apiOnly {
+	fmt.Printf("\n📡 API Endpoints:\n")
+	fmt.Printf("   • Health Status:     http://localhost:%d/api/v1/health\n", cfg.Server.Port)
+	fmt.Printf("   • Cluster Health:    http://localhost:%d/api/v1/health/cluster\n", cfg.Server.Port)
+	fmt.Printf("   • Health Checks:     http://localhost:%d/api/v1/health/checks\n", cfg.Server.Port)
+	fmt.Printf("   • Prometheus Metrics: http://localhost:%d/api/v1/metrics\n", cfg.Server.Port)
+
+	if cfg.Server.EnableWeb {
 		fmt.Printf("\n🌐 Web Dashboard:\n")
-		fmt.Printf("   • Dashboard:         http://localhost:%d\n", port)
-		fmt.Printf("   • WebSocket:         ws://localhost:%d/ws\n", port)
+		fmt.Printf("   • Dashboard:         http://localhost:%d\n", cfg.Server.Port)
+		fmt.Printf("   • WebSocket:         ws://localhost:%d/ws\n", cfg.Server.Port)
 	}
 
 	fmt.Printf("\n💡 Press Ctrl+C to stop the server\n\n")
