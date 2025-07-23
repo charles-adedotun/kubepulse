@@ -156,9 +156,9 @@ func loadFromEnv(config *Config) error {
 	viper.AutomaticEnv()
 
 	// Bind environment variables
-	viper.BindEnv("kubernetes.kubeconfig", "KUBEPULSE_KUBECONFIG")
-	viper.BindEnv("monitoring.interval", "KUBEPULSE_INTERVAL")
-	viper.BindEnv("ml.enabled", "KUBEPULSE_ML_ENABLED")
+	_ = viper.BindEnv("kubernetes.kubeconfig", "KUBEPULSE_KUBECONFIG")
+	_ = viper.BindEnv("monitoring.interval", "KUBEPULSE_INTERVAL")
+	_ = viper.BindEnv("ml.enabled", "KUBEPULSE_ML_ENABLED")
 
 	// Override with environment values if set
 	if viper.IsSet("kubernetes.kubeconfig") {

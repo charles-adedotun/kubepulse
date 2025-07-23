@@ -144,9 +144,11 @@ func runSingleHealthCheck(engine *core.Engine, client kubernetes.Interface, chec
 	case "pod-health":
 		podCheck := health.NewPodHealthCheck()
 		if namespace != "" {
-			podCheck.Configure(map[string]interface{}{
+			if err := podCheck.Configure(map[string]interface{}{
 				"namespace": namespace,
-			})
+			}); err != nil {
+				return core.CheckResult{}, fmt.Errorf("failed to configure pod check: %w", err)
+			}
 		}
 		check = podCheck
 
@@ -156,9 +158,11 @@ func runSingleHealthCheck(engine *core.Engine, client kubernetes.Interface, chec
 	case "service-health":
 		serviceCheck := health.NewServiceHealthCheck()
 		if namespace != "" {
-			serviceCheck.Configure(map[string]interface{}{
+			if err := serviceCheck.Configure(map[string]interface{}{
 				"namespace": namespace,
-			})
+			}); err != nil {
+				return core.CheckResult{}, fmt.Errorf("failed to configure service check: %w", err)
+			}
 		}
 		check = serviceCheck
 

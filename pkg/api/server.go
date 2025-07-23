@@ -211,8 +211,8 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 				labels = "{" + labels + "}"
 			}
 
-			fmt.Fprintf(w, "# TYPE %s %s\n", metric.Name, string(metric.Type))
-			fmt.Fprintf(w, "%s%s %f %d\n",
+			_, _ = fmt.Fprintf(w, "# TYPE %s %s\n", metric.Name, string(metric.Type))
+			_, _ = fmt.Fprintf(w, "%s%s %f %d\n",
 				metric.Name,
 				labels,
 				metric.Value,
@@ -349,13 +349,13 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Set up connection cleanup
 	defer func() {
 		s.removeClient(conn)
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	// Set up ping/pong to detect dead connections
-	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
 
@@ -398,7 +398,7 @@ func (s *Server) pingClient(conn *websocket.Conn) {
 	for {
 		select {
 		case <-ticker.C:
-			conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -421,7 +421,7 @@ func (s *Server) cleanupClients() {
 
 			for conn := range s.clients {
 				// Try to ping the connection
-				conn.SetWriteDeadline(time.Now().Add(time.Second))
+				_ = conn.SetWriteDeadline(time.Now().Add(time.Second))
 				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 					deadConnections = append(deadConnections, conn)
 				}
@@ -430,7 +430,7 @@ func (s *Server) cleanupClients() {
 			// Remove dead connections
 			for _, conn := range deadConnections {
 				delete(s.clients, conn)
-				conn.Close()
+				_ = conn.Close()
 			}
 
 			if len(deadConnections) > 0 {
@@ -457,7 +457,7 @@ func (s *Server) BroadcastToClients(data interface{}) {
 	var deadConnections []*websocket.Conn
 
 	for conn := range s.clients {
-		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		if err := conn.WriteJSON(data); err != nil {
 			klog.V(3).Infof("Failed to send to WebSocket client: %v", err)
 			deadConnections = append(deadConnections, conn)
@@ -469,7 +469,7 @@ func (s *Server) BroadcastToClients(data interface{}) {
 		go func() {
 			for _, conn := range deadConnections {
 				s.removeClient(conn)
-				conn.Close()
+				_ = conn.Close()
 			}
 		}()
 	}
@@ -485,9 +485,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Close all WebSocket connections
 	s.clientsMu.Lock()
 	for conn := range s.clients {
-		conn.WriteMessage(websocket.CloseMessage,
+		_ = conn.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server shutting down"))
-		conn.Close()
+		_ = conn.Close()
 	}
 	s.clients = make(map[*websocket.Conn]bool)
 	s.clientsMu.Unlock()

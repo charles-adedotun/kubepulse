@@ -600,9 +600,5 @@ func (c *AlertCorrelator) areCorrelated(a1, a2 SmartAlert) bool {
 
 	// Time proximity
 	timeDiff := math.Abs(a1.Timestamp.Sub(a2.Timestamp).Seconds())
-	if timeDiff < 30 {
-		return true
-	}
-
-	return false
+	return timeDiff < 30
 }

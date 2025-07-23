@@ -7,7 +7,6 @@ import (
 
 	"github.com/kubepulse/kubepulse/pkg/core"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -225,6 +224,7 @@ func (n *NodeHealthCheck) getNodeResourceUsage(ctx context.Context, client kuber
 }
 
 // Helper function to convert resource quantity to float64
-func quantityToFloat64(q *resource.Quantity) float64 {
-	return float64(q.MilliValue()) / 1000.0
-}
+// quantityToFloat64 is unused but kept for future resource calculations
+// func quantityToFloat64(q *resource.Quantity) float64 {
+// 	return float64(q.MilliValue()) / 1000.0
+// }

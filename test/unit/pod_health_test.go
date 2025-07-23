@@ -36,9 +36,11 @@ func TestPodHealthCheck_AllHealthy(t *testing.T) {
 	)
 
 	check := health.NewPodHealthCheck()
-	check.Configure(map[string]interface{}{
+	if err := check.Configure(map[string]interface{}{
 		"namespace": "default",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to configure check: %v", err)
+	}
 
 	result, err := check.Check(context.Background(), client)
 
@@ -70,9 +72,11 @@ func TestPodHealthCheck_FailedPods(t *testing.T) {
 	)
 
 	check := health.NewPodHealthCheck()
-	check.Configure(map[string]interface{}{
+	if err := check.Configure(map[string]interface{}{
 		"namespace": "default",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to configure check: %v", err)
+	}
 
 	result, err := check.Check(context.Background(), client)
 
@@ -109,9 +113,11 @@ func TestPodHealthCheck_ProblematicPending(t *testing.T) {
 	)
 
 	check := health.NewPodHealthCheck()
-	check.Configure(map[string]interface{}{
+	if err := check.Configure(map[string]interface{}{
 		"namespace": "default",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to configure check: %v", err)
+	}
 
 	result, err := check.Check(context.Background(), client)
 
@@ -150,9 +156,11 @@ func TestPodHealthCheck_HighRestartCount(t *testing.T) {
 	)
 
 	check := health.NewPodHealthCheck()
-	check.Configure(map[string]interface{}{
+	if err := check.Configure(map[string]interface{}{
 		"namespace": "default",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to configure check: %v", err)
+	}
 
 	result, err := check.Check(context.Background(), client)
 
@@ -207,9 +215,11 @@ func TestPodHealthCheck_Metrics(t *testing.T) {
 	)
 
 	check := health.NewPodHealthCheck()
-	check.Configure(map[string]interface{}{
+	if err := check.Configure(map[string]interface{}{
 		"namespace": "default",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to configure check: %v", err)
+	}
 
 	result, err := check.Check(context.Background(), client)
 
@@ -245,9 +255,11 @@ func TestPodHealthCheck_APIError(t *testing.T) {
 	})
 
 	check := health.NewPodHealthCheck()
-	check.Configure(map[string]interface{}{
+	if err := check.Configure(map[string]interface{}{
 		"namespace": "default",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to configure check: %v", err)
+	}
 
 	_, err := check.Check(context.Background(), client)
 

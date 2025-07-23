@@ -68,14 +68,20 @@ func runMonitor(cmd *cobra.Command, args []string) error {
 	// Register built-in checks
 	podCheck := health.NewPodHealthCheck()
 	if namespace != "" {
-		podCheck.Configure(map[string]interface{}{
+		if err := podCheck.Configure(map[string]interface{}{
 			"namespace": namespace,
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to configure pod check: %w", err)
+		}
 	}
-	registry.Register(podCheck)
+	if err := registry.Register(podCheck); err != nil {
+		return fmt.Errorf("failed to register pod check: %w", err)
+	}
 
 	nodeCheck := health.NewNodeHealthCheck()
-	registry.Register(nodeCheck)
+	if err := registry.Register(nodeCheck); err != nil {
+		return fmt.Errorf("failed to register node check: %w", err)
+	}
 
 	// Add enabled checks to the engine
 	for _, checkName := range enabledChecks {

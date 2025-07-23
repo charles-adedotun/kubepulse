@@ -49,7 +49,9 @@ func (s *Server) HandleAssistantQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		klog.Errorf("Failed to encode response: %v", err)
+	}
 }
 
 // HandlePredictiveInsights returns AI predictions
@@ -62,10 +64,12 @@ func (s *Server) HandlePredictiveInsights(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"predictions":  insights,
 		"generated_at": time.Now(),
-	})
+	}); err != nil {
+		klog.Errorf("Failed to encode response: %v", err)
+	}
 }
 
 // HandleRemediationSuggestions returns remediation suggestions for a check
@@ -90,10 +94,12 @@ func (s *Server) HandleRemediationSuggestions(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"check":       checkName,
 		"suggestions": suggestions,
-	})
+	}); err != nil {
+		klog.Errorf("Failed to encode response: %v", err)
+	}
 }
 
 // HandleExecuteRemediation executes a remediation action
@@ -117,7 +123,9 @@ func (s *Server) HandleExecuteRemediation(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(record)
+	if err := json.NewEncoder(w).Encode(record); err != nil {
+		klog.Errorf("Failed to encode response: %v", err)
+	}
 }
 
 // HandleSmartAlerts returns intelligent alert insights
@@ -130,5 +138,7 @@ func (s *Server) HandleSmartAlerts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(insights)
+	if err := json.NewEncoder(w).Encode(insights); err != nil {
+		klog.Errorf("Failed to encode response: %v", err)
+	}
 }

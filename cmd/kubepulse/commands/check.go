@@ -41,9 +41,11 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	case "pod-health":
 		check := health.NewPodHealthCheck()
 		if namespace != "" {
-			check.Configure(map[string]interface{}{
+			if err := check.Configure(map[string]interface{}{
 				"namespace": namespace,
-			})
+			}); err != nil {
+				return fmt.Errorf("failed to configure pod check: %w", err)
+			}
 		}
 		result, err = check.Check(ctx, client)
 

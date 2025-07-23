@@ -104,7 +104,7 @@ func (a *AnomalyDetector) updateBaseline(baseline *Baseline, value float64) {
 	// Calculate standard deviation
 	variance := 0.0
 	for _, v := range baseline.Window {
-		variance += math.Pow(v-baseline.Mean, 2)
+		variance += (v - baseline.Mean) * (v - baseline.Mean)
 	}
 	baseline.StdDev = math.Sqrt(variance / float64(len(baseline.Window)))
 

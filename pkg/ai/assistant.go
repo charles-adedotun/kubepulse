@@ -278,12 +278,13 @@ func (a *Assistant) isOptimizationQuery(q string) bool {
 }
 
 // Helper methods
-func (a *Assistant) enhanceWithContext(question string, health *ClusterHealth) string {
-	return fmt.Sprintf(`User Question: %s
-Cluster Status: %s (Score: %.2f)
-Context: %+v`,
-		question, health.Status, health.Score.Weighted, a.knowledge.clusterContext)
-}
+// enhanceWithContext is unused but kept for future implementation
+// func (a *Assistant) enhanceWithContext(question string, health *ClusterHealth) string {
+// 	return fmt.Sprintf(`User Question: %s
+// Cluster Status: %s (Score: %.2f)
+// Context: %+v`,
+// 		question, health.Status, health.Score.Weighted, a.knowledge.clusterContext)
+// }
 
 func (a *Assistant) categorizeQuery(query string) string {
 	if a.isPerformanceQuery(query) {

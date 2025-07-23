@@ -132,9 +132,10 @@ func (t *Tracker) calculateAvailability(metrics []Metric) float64 {
 	var totalRequests, successfulRequests float64
 
 	for _, metric := range metrics {
-		if metric.Name == "request_total" {
+		switch metric.Name {
+		case "request_total":
 			totalRequests += metric.Value
-		} else if metric.Name == "request_success" {
+		case "request_success":
 			successfulRequests += metric.Value
 		}
 	}
@@ -169,9 +170,10 @@ func (t *Tracker) calculateErrorRate(metrics []Metric) float64 {
 	var totalRequests, errorRequests float64
 
 	for _, metric := range metrics {
-		if metric.Name == "request_total" {
+		switch metric.Name {
+		case "request_total":
 			totalRequests += metric.Value
-		} else if metric.Name == "request_errors" {
+		case "request_errors":
 			errorRequests += metric.Value
 		}
 	}
