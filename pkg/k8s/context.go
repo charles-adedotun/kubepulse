@@ -67,7 +67,7 @@ func (cm *ContextManager) ListContexts() ([]ContextInfo, error) {
 	var contexts []ContextInfo
 	for name, context := range cm.config.Contexts {
 		cluster := cm.config.Clusters[context.Cluster]
-		authInfo := cm.config.AuthInfos[context.AuthInfo]
+		// authInfo := cm.config.AuthInfos[context.AuthInfo] // Could be used for user info in the future
 
 		namespace := context.Namespace
 		if namespace == "" {
@@ -86,9 +86,7 @@ func (cm *ContextManager) ListContexts() ([]ContextInfo, error) {
 			info.Server = cluster.Server
 		}
 
-		if authInfo != nil {
-			// Could add more user info if needed
-		}
+		// authInfo could be used to add user info if needed in the future
 
 		contexts = append(contexts, info)
 	}

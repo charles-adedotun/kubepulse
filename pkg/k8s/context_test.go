@@ -61,7 +61,7 @@ func createTestKubeconfig(t *testing.T) string {
 
 func TestNewContextManager(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	tests := []struct {
 		name           string
@@ -111,7 +111,7 @@ func TestNewContextManager(t *testing.T) {
 
 func TestListContexts(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
@@ -166,7 +166,7 @@ func TestListContexts(t *testing.T) {
 
 func TestGetCurrentContext(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
@@ -188,7 +188,7 @@ func TestGetCurrentContext(t *testing.T) {
 
 func TestSwitchContext(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
@@ -229,7 +229,7 @@ func TestSwitchContext(t *testing.T) {
 
 func TestGetClient(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
@@ -261,7 +261,7 @@ func TestGetClient(t *testing.T) {
 
 func TestGetNamespace(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
@@ -289,7 +289,7 @@ func TestGetNamespace(t *testing.T) {
 
 func TestRefreshContexts(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
@@ -337,7 +337,7 @@ func TestRefreshContexts(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
-	defer os.Remove(kubeconfigPath)
+	defer func() { _ = os.Remove(kubeconfigPath) }()
 	
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
@@ -350,7 +350,7 @@ func TestConcurrentAccess(t *testing.T) {
 	// Goroutine 1: List contexts repeatedly
 	go func() {
 		for i := 0; i < 10; i++ {
-			cm.ListContexts()
+			_, _ = cm.ListContexts()
 		}
 		done <- true
 	}()
@@ -358,8 +358,8 @@ func TestConcurrentAccess(t *testing.T) {
 	// Goroutine 2: Switch contexts
 	go func() {
 		for i := 0; i < 5; i++ {
-			cm.SwitchContext("context-1")
-			cm.SwitchContext("context-2")
+			_ = cm.SwitchContext("context-1")
+			_ = cm.SwitchContext("context-2")
 		}
 		done <- true
 	}()
@@ -367,7 +367,7 @@ func TestConcurrentAccess(t *testing.T) {
 	// Goroutine 3: Get current context
 	go func() {
 		for i := 0; i < 10; i++ {
-			cm.GetCurrentContext()
+			_, _ = cm.GetCurrentContext()
 		}
 		done <- true
 	}()
