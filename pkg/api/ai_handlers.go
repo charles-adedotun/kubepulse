@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	
+
 	"github.com/gorilla/mux"
 	"k8s.io/klog/v2"
 )
@@ -27,27 +27,27 @@ func (s *Server) HandleAssistantQuery(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	var req QueryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+
 	if req.Query == "" {
 		http.Error(w, "Query cannot be empty", http.StatusBadRequest)
 		return
 	}
-	
+
 	klog.V(2).Infof("Processing assistant query: %s", req.Query)
-	
+
 	response, err := s.engine.QueryAssistant(req.Query)
 	if err != nil {
 		klog.Errorf("Assistant query failed: %v", err)
 		http.Error(w, "Query processing failed", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -60,10 +60,10 @@ func (s *Server) HandlePredictiveInsights(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Failed to generate predictions", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"predictions": insights,
+		"predictions":  insights,
 		"generated_at": time.Now(),
 	})
 }
@@ -72,12 +72,12 @@ func (s *Server) HandlePredictiveInsights(w http.ResponseWriter, r *http.Request
 func (s *Server) HandleRemediationSuggestions(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	checkName := vars["check"]
-	
+
 	if checkName == "" {
 		http.Error(w, "Check name is required", http.StatusBadRequest)
 		return
 	}
-	
+
 	suggestions, err := s.engine.GetRemediationSuggestions(checkName)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -88,10 +88,10 @@ func (s *Server) HandleRemediationSuggestions(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Failed to generate suggestions", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"check": checkName,
+		"check":       checkName,
 		"suggestions": suggestions,
 	})
 }
@@ -102,20 +102,20 @@ func (s *Server) HandleExecuteRemediation(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	var req RemediationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+
 	record, err := s.engine.ExecuteRemediation(req.ActionID, req.DryRun)
 	if err != nil {
 		klog.Errorf("Remediation execution failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(record)
 }
@@ -128,8 +128,7 @@ func (s *Server) HandleSmartAlerts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get alert insights", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(insights)
 }
-

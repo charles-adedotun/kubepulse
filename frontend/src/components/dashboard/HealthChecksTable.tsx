@@ -6,6 +6,8 @@ export interface HealthCheck {
   name: string
   status: "healthy" | "degraded" | "unhealthy"
   message: string
+  timestamp?: string
+  duration?: number
 }
 
 interface HealthChecksTableProps {
@@ -78,8 +80,18 @@ export function HealthChecksTable({ checks }: HealthChecksTableProps) {
               <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/5" />
               <div className="relative flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-base mb-1 text-foreground/90">{check.name}</h3>
-                  <p className="text-sm text-muted-foreground">{check.message}</p>
+                  <h3 className="font-semibold text-base mb-1 text-foreground/90">
+                    {check.name.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-2">{check.message}</p>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    {check.timestamp && (
+                      <span>Last checked: {new Date(check.timestamp).toLocaleTimeString()}</span>
+                    )}
+                    {check.duration && (
+                      <span>Duration: {Math.round(check.duration / 1000000)}ms</span>
+                    )}
+                  </div>
                 </div>
                 <Badge 
                   variant={getStatusVariant(check.status)} 

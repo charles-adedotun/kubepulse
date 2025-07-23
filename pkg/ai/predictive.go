@@ -2,22 +2,22 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
-	"encoding/json"
-	
+
 	"k8s.io/klog/v2"
 )
 
 // PredictiveAnalyzer provides AI-powered predictive analytics
 type PredictiveAnalyzer struct {
-	client *Client
+	client  *Client
 	history *MetricsHistory
 }
 
 // MetricsHistory stores historical data for pattern analysis
 type MetricsHistory struct {
-	data map[string][]TimeSeriesPoint
+	data   map[string][]TimeSeriesPoint
 	maxAge time.Duration
 }
 
@@ -30,13 +30,13 @@ type TimeSeriesPoint struct {
 
 // PredictiveInsight represents an AI prediction
 type PredictiveInsight struct {
-	Type        string    `json:"type"`
-	Resource    string    `json:"resource"`
-	Prediction  string    `json:"prediction"`
-	Confidence  float64   `json:"confidence"`
-	TimeWindow  string    `json:"time_window"`
-	Impact      string    `json:"impact"`
-	Preventive  []string  `json:"preventive_actions"`
+	Type       string   `json:"type"`
+	Resource   string   `json:"resource"`
+	Prediction string   `json:"prediction"`
+	Confidence float64  `json:"confidence"`
+	TimeWindow string   `json:"time_window"`
+	Impact     string   `json:"impact"`
+	Preventive []string `json:"preventive_actions"`
 }
 
 // NewPredictiveAnalyzer creates a new predictive analyzer
@@ -44,7 +44,7 @@ func NewPredictiveAnalyzer(client *Client) *PredictiveAnalyzer {
 	return &PredictiveAnalyzer{
 		client: client,
 		history: &MetricsHistory{
-			data: make(map[string][]TimeSeriesPoint),
+			data:   make(map[string][]TimeSeriesPoint),
 			maxAge: 24 * time.Hour,
 		},
 	}
@@ -54,16 +54,16 @@ func NewPredictiveAnalyzer(client *Client) *PredictiveAnalyzer {
 func (p *PredictiveAnalyzer) AnalyzeTrends(ctx context.Context, metrics []Metric) ([]PredictiveInsight, error) {
 	// Update history
 	p.updateHistory(metrics)
-	
+
 	// Prepare data for AI analysis
 	analysisData := p.prepareAnalysisData()
-	
+
 	request := AnalysisRequest{
 		Type:    AnalysisTypePredictive,
 		Context: "Predictive analytics for Kubernetes cluster",
 		Data: map[string]interface{}{
 			"metrics_history": analysisData,
-			"analysis_type": "time_series_prediction",
+			"analysis_type":   "time_series_prediction",
 		},
 		Timestamp: time.Now(),
 	}
@@ -80,7 +80,7 @@ func (p *PredictiveAnalyzer) AnalyzeTrends(ctx context.Context, metrics []Metric
 		predictions = p.parseTextPredictions(response.Diagnosis)
 	}
 
-	klog.V(2).Infof("Generated %d predictive insights with average confidence %.2f", 
+	klog.V(2).Infof("Generated %d predictive insights with average confidence %.2f",
 		len(predictions), p.averageConfidence(predictions))
 
 	return predictions, nil
@@ -89,7 +89,7 @@ func (p *PredictiveAnalyzer) AnalyzeTrends(ctx context.Context, metrics []Metric
 // DetectAnomalies uses AI to detect anomalies in real-time
 func (p *PredictiveAnalyzer) DetectAnomalies(ctx context.Context, current CheckResult) (*AnomalyReport, error) {
 	historical := p.getHistoricalData(current.Name)
-	
+
 	request := AnalysisRequest{
 		Type:        AnalysisTypePredictive,
 		Context:     "Real-time anomaly detection",
@@ -117,19 +117,19 @@ func (p *PredictiveAnalyzer) DetectAnomalies(ctx context.Context, current CheckR
 func (p *PredictiveAnalyzer) updateHistory(metrics []Metric) {
 	now := time.Now()
 	cutoff := now.Add(-p.history.maxAge)
-	
+
 	for _, metric := range metrics {
 		key := fmt.Sprintf("%s_%s", metric.Name, metric.Type)
-		
+
 		// Add new point
 		point := TimeSeriesPoint{
 			Timestamp: metric.Timestamp,
 			Value:     metric.Value,
 			Labels:    metric.Labels,
 		}
-		
+
 		p.history.data[key] = append(p.history.data[key], point)
-		
+
 		// Remove old points
 		filtered := []TimeSeriesPoint{}
 		for _, pt := range p.history.data[key] {
@@ -150,17 +150,17 @@ func (p *PredictiveAnalyzer) prepareAnalysisData() string {
 // getHistoricalData retrieves historical data for a check
 func (p *PredictiveAnalyzer) getHistoricalData(checkName string) map[string]interface{} {
 	relevant := make(map[string][]TimeSeriesPoint)
-	
+
 	for key, points := range p.history.data {
 		if len(points) > 0 && points[0].Labels["check"] == checkName {
 			relevant[key] = points
 		}
 	}
-	
+
 	return map[string]interface{}{
 		"data_points": len(relevant),
-		"time_range": "24h",
-		"metrics": relevant,
+		"time_range":  "24h",
+		"metrics":     relevant,
 	}
 }
 
@@ -186,13 +186,13 @@ func (p *PredictiveAnalyzer) parseTextPredictions(text string) []PredictiveInsig
 // extractAnomalies extracts anomaly details from response
 func (p *PredictiveAnalyzer) extractAnomalies(response *AnalysisResponse) []string {
 	anomalies := []string{}
-	
+
 	for _, rec := range response.Recommendations {
 		if rec.Category == "anomaly" {
 			anomalies = append(anomalies, rec.Description)
 		}
 	}
-	
+
 	return anomalies
 }
 
@@ -201,19 +201,19 @@ func (p *PredictiveAnalyzer) averageConfidence(predictions []PredictiveInsight) 
 	if len(predictions) == 0 {
 		return 0
 	}
-	
+
 	sum := 0.0
 	for _, pred := range predictions {
 		sum += pred.Confidence
 	}
-	
+
 	return sum / float64(len(predictions))
 }
 
 // AnomalyReport represents anomaly detection results
 type AnomalyReport struct {
-	Score       float64  `json:"anomaly_score"`
-	Anomalies   []string `json:"anomalies"`
+	Score       float64       `json:"anomaly_score"`
+	Anomalies   []string      `json:"anomalies"`
 	Severity    SeverityLevel `json:"severity"`
-	Explanation string   `json:"explanation"`
+	Explanation string        `json:"explanation"`
 }

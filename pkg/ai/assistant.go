@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	
+
 	"k8s.io/klog/v2"
 )
 
@@ -42,12 +42,12 @@ type Pattern struct {
 
 // QueryResponse represents assistant's response to a query
 type QueryResponse struct {
-	Answer      string   `json:"answer"`
-	Confidence  float64  `json:"confidence"`
-	Actions     []string `json:"suggested_actions,omitempty"`
-	Commands    []string `json:"commands,omitempty"`
-	References  []string `json:"references,omitempty"`
-	Followup    []string `json:"followup_questions,omitempty"`
+	Answer     string   `json:"answer"`
+	Confidence float64  `json:"confidence"`
+	Actions    []string `json:"suggested_actions,omitempty"`
+	Commands   []string `json:"commands,omitempty"`
+	References []string `json:"references,omitempty"`
+	Followup   []string `json:"followup_questions,omitempty"`
 }
 
 // NewAssistant creates a new AI assistant
@@ -66,7 +66,7 @@ func NewAssistant(client *Client) *Assistant {
 // Query processes natural language queries about the cluster
 func (a *Assistant) Query(ctx context.Context, question string, clusterHealth *ClusterHealth) (*QueryResponse, error) {
 	klog.V(2).Infof("Processing natural language query: %s", question)
-	
+
 	request := AnalysisRequest{
 		Type:    AnalysisTypeSummary,
 		Context: "Natural language query from user",
@@ -78,26 +78,26 @@ func (a *Assistant) Query(ctx context.Context, question string, clusterHealth *C
 		ClusterInfo: clusterHealth,
 		Timestamp:   time.Now(),
 	}
-	
+
 	// Special handling for common query types
 	if a.isPerformanceQuery(question) {
 		return a.handlePerformanceQuery(ctx, question, clusterHealth)
 	}
-	
+
 	if a.isTroubleshootingQuery(question) {
 		return a.handleTroubleshootingQuery(ctx, question, clusterHealth)
 	}
-	
+
 	if a.isOptimizationQuery(question) {
 		return a.handleOptimizationQuery(ctx, question, clusterHealth)
 	}
-	
+
 	// General query handling
 	response, err := a.client.Analyze(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("assistant query failed: %w", err)
 	}
-	
+
 	return &QueryResponse{
 		Answer:     response.Summary,
 		Confidence: response.Confidence,
@@ -119,10 +119,10 @@ func (a *Assistant) LearnFromFeedback(ctx context.Context, query string, respons
 			Confidence:  response.Confidence,
 			LastApplied: time.Now(),
 		}
-		
+
 		key := a.categorizeQuery(query)
 		a.knowledge.solutions[key] = append(a.knowledge.solutions[key], solution)
-		
+
 		klog.V(2).Infof("Learned new solution for category: %s", key)
 	}
 }
@@ -148,21 +148,21 @@ Analyze performance issues and provide:
 3. Specific optimization recommendations
 4. kubectl commands to investigate further
 
-Focus on actionable insights.`, 
+Focus on actionable insights.`,
 		question, health.Status, health.Score.Weighted, len(health.Checks))
-	
+
 	request := AnalysisRequest{
 		Type:        AnalysisTypeOptimization,
 		Context:     prompt,
 		ClusterInfo: health,
 		Timestamp:   time.Now(),
 	}
-	
+
 	response, err := a.client.Analyze(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return a.formatResponse(response), nil
 }
 
@@ -175,7 +175,7 @@ func (a *Assistant) handleTroubleshootingQuery(ctx context.Context, question str
 			failingChecks = append(failingChecks, check)
 		}
 	}
-	
+
 	prompt := fmt.Sprintf(`Troubleshooting Query:
 Question: %s
 
@@ -191,19 +191,19 @@ Provide:
 3. Specific commands to run
 4. Prevention measures`,
 		question, failingChecks, a.knowledge.patterns)
-	
+
 	request := AnalysisRequest{
 		Type:        AnalysisTypeRootCause,
 		Context:     prompt,
 		ClusterInfo: health,
 		Timestamp:   time.Now(),
 	}
-	
+
 	response, err := a.client.Analyze(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return a.formatResponse(response), nil
 }
 
@@ -211,7 +211,7 @@ Provide:
 func (a *Assistant) handleOptimizationQuery(ctx context.Context, question string, health *ClusterHealth) (*QueryResponse, error) {
 	// Analyze resource usage patterns
 	predictions, _ := a.analyzer.AnalyzeTrends(ctx, a.extractMetrics(health))
-	
+
 	prompt := fmt.Sprintf(`Optimization Query:
 Question: %s
 
@@ -224,7 +224,7 @@ Provide:
 3. Cost-saving suggestions
 4. Implementation commands`,
 		question, predictions)
-	
+
 	request := AnalysisRequest{
 		Type:        AnalysisTypeOptimization,
 		Context:     prompt,
@@ -234,12 +234,12 @@ Provide:
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	response, err := a.client.Analyze(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return a.formatResponse(response), nil
 }
 
@@ -327,19 +327,19 @@ func (a *Assistant) extractReferences(response *AnalysisResponse) []string {
 func (a *Assistant) generateFollowupQuestions(original string, response *AnalysisResponse) []string {
 	// Generate contextual follow-up questions
 	followups := []string{}
-	
+
 	if response.Severity == SeverityCritical {
 		followups = append(followups, "Would you like me to generate a remediation plan?")
 	}
-	
+
 	if len(response.Actions) > 0 {
 		followups = append(followups, "Should I execute these commands for you?")
 	}
-	
+
 	if response.Confidence < 0.7 {
 		followups = append(followups, "Can you provide more details about the issue?")
 	}
-	
+
 	return followups
 }
 

@@ -69,6 +69,37 @@ make run                    # Backend only
 make frontend-dev          # Frontend only
 ```
 
+#### Frontend Development Setup
+
+The KubePulse frontend is built with React, TypeScript, and Vite for a modern development experience.
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server (with hot reload)
+npm run dev
+
+# Build for production
+npm run build
+
+# Run type checking
+npm run type-check
+
+# Run linting
+npm run lint
+```
+
+Frontend features:
+- **Modern React 18** with TypeScript
+- **Real-time WebSocket** integration for live updates
+- **Responsive design** with Tailwind CSS
+- **Dark/Light theme** support
+- **Enhanced UI components** for comprehensive monitoring
+
 ### Basic Usage
 
 #### CLI Commands

@@ -28,14 +28,14 @@ type ResponseParser struct {
 func NewResponseParser() *ResponseParser {
 	return &ResponseParser{
 		patterns: map[string]*regexp.Regexp{
-			"summary":      regexp.MustCompile(`(?i)(?:summary|overview):\s*(.+?)(?:\n\n|\n[A-Z]|$)`),
-			"diagnosis":    regexp.MustCompile(`(?i)(?:diagnosis|analysis):\s*(.+?)(?:\n\n|\n[A-Z]|$)`),
-			"confidence":   regexp.MustCompile(`(?i)confidence[:\s]+(\d+(?:\.\d+)?)[%\s]?`),
-			"severity":     regexp.MustCompile(`(?i)severity[:\s]+(critical|high|medium|low)`),
-			"json_block":   regexp.MustCompile("```json\\s*([\\s\\S]*?)\\s*```"),
-			"action_cmd":   regexp.MustCompile(`kubectl\s+[^\n]+`),
-			"numbered":     regexp.MustCompile(`^\d+\.\s+(.+)$`),
-			"bulleted":     regexp.MustCompile(`^[-*]\s+(.+)$`),
+			"summary":    regexp.MustCompile(`(?i)(?:summary|overview):\s*(.+?)(?:\n\n|\n[A-Z]|$)`),
+			"diagnosis":  regexp.MustCompile(`(?i)(?:diagnosis|analysis):\s*(.+?)(?:\n\n|\n[A-Z]|$)`),
+			"confidence": regexp.MustCompile(`(?i)confidence[:\s]+(\d+(?:\.\d+)?)[%\s]?`),
+			"severity":   regexp.MustCompile(`(?i)severity[:\s]+(critical|high|medium|low)`),
+			"json_block": regexp.MustCompile("```json\\s*([\\s\\S]*?)\\s*```"),
+			"action_cmd": regexp.MustCompile(`kubectl\s+[^\n]+`),
+			"numbered":   regexp.MustCompile(`^\d+\.\s+(.+)$`),
+			"bulleted":   regexp.MustCompile(`^[-*]\s+(.+)$`),
 		},
 	}
 }
@@ -46,7 +46,7 @@ func (p *ResponseParser) ParseResponse(text string, request AnalysisRequest) (*A
 	if structured := p.tryParseJSON(text); structured != nil {
 		return p.convertStructuredResponse(structured), nil
 	}
-	
+
 	// Strategy 2: Use pattern-based extraction with improved logic
 	response := &AnalysisResponse{
 		Summary:         p.extractSummary(text),
@@ -57,7 +57,7 @@ func (p *ResponseParser) ParseResponse(text string, request AnalysisRequest) (*A
 		Actions:         p.extractActions(text),
 		Context:         make(map[string]interface{}),
 	}
-	
+
 	// Set reasonable defaults
 	if response.Confidence == 0 {
 		response.Confidence = 0.7 // Moderate confidence as default
@@ -68,7 +68,7 @@ func (p *ResponseParser) ParseResponse(text string, request AnalysisRequest) (*A
 	if response.Summary == "" {
 		response.Summary = p.generateFallbackSummary(text, request)
 	}
-	
+
 	return response, nil
 }
 
@@ -81,13 +81,13 @@ func (p *ResponseParser) tryParseJSON(text string) *StructuredResponse {
 			return &structured
 		}
 	}
-	
+
 	// Try to parse the entire response as JSON
 	var structured StructuredResponse
 	if err := json.Unmarshal([]byte(text), &structured); err == nil {
 		return &structured
 	}
-	
+
 	return nil
 }
 
@@ -110,7 +110,7 @@ func (p *ResponseParser) extractSummary(text string) string {
 	if matches := p.patterns["summary"].FindStringSubmatch(text); len(matches) > 1 {
 		return strings.TrimSpace(matches[1])
 	}
-	
+
 	// Fallback: look for first substantial paragraph
 	lines := strings.Split(text, "\n")
 	for _, line := range lines {
@@ -123,7 +123,7 @@ func (p *ResponseParser) extractSummary(text string) string {
 			return line
 		}
 	}
-	
+
 	// Last resort: first meaningful sentence
 	sentences := strings.Split(text, ".")
 	for _, sentence := range sentences {
@@ -132,7 +132,7 @@ func (p *ResponseParser) extractSummary(text string) string {
 			return sentence + "."
 		}
 	}
-	
+
 	return "AI analysis completed"
 }
 
@@ -142,7 +142,7 @@ func (p *ResponseParser) extractDiagnosis(text string) string {
 	if matches := p.patterns["diagnosis"].FindStringSubmatch(text); len(matches) > 1 {
 		return strings.TrimSpace(matches[1])
 	}
-	
+
 	// Look for detailed sections
 	keywords := []string{"diagnosis", "analysis", "root cause", "issue", "problem"}
 	for _, keyword := range keywords {
@@ -153,17 +153,17 @@ func (p *ResponseParser) extractDiagnosis(text string) string {
 			}
 		}
 	}
-	
+
 	// Fallback to extracting technical paragraphs
 	paragraphs := strings.Split(text, "\n\n")
 	for _, para := range paragraphs {
 		para = strings.TrimSpace(para)
-		if len(para) > 100 && (strings.Contains(para, "kubectl") || 
+		if len(para) > 100 && (strings.Contains(para, "kubectl") ||
 			strings.Contains(para, "pod") || strings.Contains(para, "node")) {
 			return para
 		}
 	}
-	
+
 	return text // Return full text as last resort
 }
 
@@ -178,7 +178,7 @@ func (p *ResponseParser) extractConfidence(text string) float64 {
 			return val
 		}
 	}
-	
+
 	// Use keywords to estimate confidence
 	text = strings.ToLower(text)
 	if strings.Contains(text, "definitely") || strings.Contains(text, "certain") {
@@ -193,7 +193,7 @@ func (p *ResponseParser) extractConfidence(text string) float64 {
 	if strings.Contains(text, "uncertain") || strings.Contains(text, "unclear") {
 		return 0.4
 	}
-	
+
 	return 0.7 // Default moderate confidence
 }
 
@@ -212,13 +212,13 @@ func (p *ResponseParser) extractSeverity(text string) SeverityLevel {
 			return SeverityLow
 		}
 	}
-	
+
 	// Keyword-based detection
 	text = strings.ToLower(text)
 	criticalKeywords := []string{"critical", "urgent", "emergency", "down", "failed"}
 	highKeywords := []string{"important", "significant", "major"}
 	lowKeywords := []string{"minor", "trivial", "cosmetic"}
-	
+
 	for _, keyword := range criticalKeywords {
 		if strings.Contains(text, keyword) {
 			return SeverityCritical
@@ -234,7 +234,7 @@ func (p *ResponseParser) extractSeverity(text string) SeverityLevel {
 			return SeverityLow
 		}
 	}
-	
+
 	return SeverityMedium
 }
 
@@ -243,10 +243,10 @@ func (p *ResponseParser) extractRecommendations(text string) []Recommendation {
 	var recommendations []Recommendation
 	lines := strings.Split(text, "\n")
 	priority := 1
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		
+
 		// Check for numbered or bulleted items
 		if matches := p.patterns["numbered"].FindStringSubmatch(line); len(matches) > 1 {
 			rec := Recommendation{
@@ -272,7 +272,7 @@ func (p *ResponseParser) extractRecommendations(text string) []Recommendation {
 			priority++
 		}
 	}
-	
+
 	// If no structured recommendations found, create generic ones
 	if len(recommendations) == 0 && len(text) > 100 {
 		recommendations = append(recommendations, Recommendation{
@@ -284,7 +284,7 @@ func (p *ResponseParser) extractRecommendations(text string) []Recommendation {
 			Effort:      "low",
 		})
 	}
-	
+
 	return recommendations
 }
 
@@ -292,7 +292,7 @@ func (p *ResponseParser) extractRecommendations(text string) []Recommendation {
 func (p *ResponseParser) extractActions(text string) []SuggestedAction {
 	var actions []SuggestedAction
 	actionID := 1
-	
+
 	// Find kubectl commands
 	cmdMatches := p.patterns["action_cmd"].FindAllString(text, -1)
 	for _, cmd := range cmdMatches {
@@ -308,7 +308,7 @@ func (p *ResponseParser) extractActions(text string) []SuggestedAction {
 		actions = append(actions, action)
 		actionID++
 	}
-	
+
 	return actions
 }
 

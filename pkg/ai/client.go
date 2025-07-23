@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -47,8 +48,8 @@ func NewClient(config Config) *Client {
 
 	// Initialize circuit breaker for AI calls
 	circuitBreaker := NewCircuitBreaker(CircuitBreakerConfig{
-		MaxFailures:  3,  // Allow 3 failures before opening
-		Timeout:      5 * time.Minute, // Wait 5 minutes before retry
+		MaxFailures:  3,                // Allow 3 failures before opening
+		Timeout:      5 * time.Minute,  // Wait 5 minutes before retry
 		ResetTimeout: 30 * time.Second, // Stay in half-open for 30 seconds
 		OnStateChange: func(from, to CircuitState) {
 			klog.Infof("AI Circuit breaker state changed: %s -> %s", from, to)
@@ -68,13 +69,19 @@ func NewClient(config Config) *Client {
 // Analyze performs AI analysis on the given request
 func (c *Client) Analyze(ctx context.Context, request AnalysisRequest) (*AnalysisResponse, error) {
 	start := time.Now()
-	
+
 	prompt, err := c.buildPrompt(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build prompt: %w", err)
 	}
 
 	klog.V(2).Infof("AI Analysis: Running Claude Code CLI analysis for type=%s", request.Type)
+	klog.V(3).Infof("AI Analysis prompt preview (first 200 chars): %s", func() string {
+		if len(prompt) > 200 {
+			return prompt[:200] + "..."
+		}
+		return prompt
+	}())
 
 	var result string
 	err = c.circuitBreaker.Execute(ctx, func(ctx context.Context) error {
@@ -82,7 +89,7 @@ func (c *Client) Analyze(ctx context.Context, request AnalysisRequest) (*Analysi
 		result, execErr = c.runClaude(ctx, prompt)
 		return execErr
 	})
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("claude analysis failed: %w", err)
 	}
@@ -97,7 +104,7 @@ func (c *Client) Analyze(ctx context.Context, request AnalysisRequest) (*Analysi
 	response.Timestamp = time.Now()
 	response.Duration = time.Since(start)
 
-	klog.V(2).Infof("AI Analysis completed: type=%s, confidence=%.2f, duration=%v", 
+	klog.V(2).Infof("AI Analysis completed: type=%s, confidence=%.2f, duration=%v",
 		request.Type, response.Confidence, response.Duration)
 
 	return response, nil
@@ -142,8 +149,8 @@ func (c *Client) AnalyzeCluster(ctx context.Context, clusterHealth *ClusterHealt
 		Timestamp:   time.Now(),
 	}
 
-	// Add timeout to prevent hanging
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	// Add timeout to prevent hanging (increased to 60s for AI analysis)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	response, err := c.Analyze(ctx, request)
@@ -153,14 +160,14 @@ func (c *Client) AnalyzeCluster(ctx context.Context, clusterHealth *ClusterHealt
 
 	// Convert to InsightSummary
 	summary := &InsightSummary{
-		OverallHealth:    response.Summary,
-		CriticalIssues:   c.countCriticalIssues(clusterHealth),
-		Recommendations:  response.Recommendations,
-		TrendAnalysis:    response.Diagnosis,
-		HealthScore:      clusterHealth.Score.Weighted,
-		AIConfidence:     response.Confidence,
-		LastAnalyzed:     response.Timestamp,
-		Context:          response.Context,
+		OverallHealth:   response.Summary,
+		CriticalIssues:  c.countCriticalIssues(clusterHealth),
+		Recommendations: response.Recommendations,
+		TrendAnalysis:   response.Diagnosis,
+		HealthScore:     clusterHealth.Score.Weighted,
+		AIConfidence:    response.Confidence,
+		LastAnalyzed:    response.Timestamp,
+		Context:         response.Context,
 	}
 
 	return summary, nil
@@ -184,21 +191,39 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 
 	args := []string{
 		"-p", sanitizedPrompt,
-		"--max-turns", fmt.Sprintf("%d", c.maxTurns),
+		"--max-turns", "1",
 		"--system-prompt", c.systemPrompt,
+		"--permission-mode", "bypassPermissions",
 	}
 
-	cmd := exec.CommandContext(ctx, c.claudePath, args...)
-	
+	// Use shell execution to inherit proper environment (like kubectl executor)
+	// This ensures Node.js/NVM environment is available for Claude CLI
+	escapedArgs := make([]string, len(args))
+	for i, arg := range args {
+		escapedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\"'\"'"))
+	}
+	cmdLine := fmt.Sprintf("%s %s", c.claudePath, strings.Join(escapedArgs, " "))
+	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine)
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	klog.V(3).Infof("Executing Claude CLI with %d character prompt", len(sanitizedPrompt))
+	// Ensure proper environment inheritance for Node.js/Claude CLI
+	cmd.Env = os.Environ() // Inherit full environment from parent process
+
+	klog.Infof("AI: Executing Claude CLI analysis (prompt length: %d chars)", len(sanitizedPrompt))
 
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			klog.Errorf("Claude CLI timed out after %v", c.timeout)
+			return "", fmt.Errorf("claude CLI timed out after %v", c.timeout)
+		}
+		klog.Errorf("Claude command failed: %v, stderr: %s, stdout: %s", err, stderr.String(), stdout.String())
 		return "", fmt.Errorf("claude command failed: %w, stderr: %s", err, stderr.String())
 	}
+
+	klog.Infof("AI: Claude CLI completed successfully (output length: %d chars)", len(stdout.String()))
 
 	return stdout.String(), nil
 }
@@ -207,22 +232,22 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 func (c *Client) validateClaudePath() error {
 	// Only allow known safe paths for Claude CLI
 	allowedPaths := []string{
-		"claude",           // From PATH
+		"claude", // From PATH
 		"/usr/local/bin/claude",
 		"/opt/homebrew/bin/claude",
 	}
-	
+
 	for _, allowed := range allowedPaths {
 		if c.claudePath == allowed {
 			return nil
 		}
 	}
-	
+
 	// Check if it's an absolute path pointing to a 'claude' binary
 	if strings.HasPrefix(c.claudePath, "/") && strings.HasSuffix(c.claudePath, "/claude") {
 		return nil
 	}
-	
+
 	return fmt.Errorf("claude path not in allowlist: %s", c.claudePath)
 }
 
@@ -231,16 +256,16 @@ func (c *Client) sanitizePrompt(prompt string) string {
 	// Remove shell escape sequences and control characters
 	sanitized := strings.ReplaceAll(prompt, "\x00", "")
 	sanitized = strings.ReplaceAll(sanitized, "\x1b", "")
-	
+
 	// Remove potential command injection patterns
 	dangerous := []string{
 		"$(", "`", ";", "&", "|", ">", "<", "&&", "||",
 	}
-	
+
 	for _, pattern := range dangerous {
 		sanitized = strings.ReplaceAll(sanitized, pattern, "")
 	}
-	
+
 	return sanitized
 }
 
@@ -323,18 +348,20 @@ func getDefaultSystemPrompt() string {
 - Incident response and root cause analysis
 - Automated remediation strategies
 
-Your role is to analyze Kubernetes health data and provide:
-1. Clear, actionable diagnostic insights
+Your role is to analyze the provided Kubernetes health data (JSON format) and provide:
+1. Clear, actionable diagnostic insights based on the data provided
 2. Specific remediation recommendations
 3. Preventive measures for future issues
 4. Automated healing suggestions when appropriate
+
+IMPORTANT: You will be provided with complete Kubernetes cluster data in JSON format. Analyze ONLY this provided data. Do not attempt to run any commands or access external systems.
 
 Always provide responses in a structured format with:
 - Clear summary of the situation
 - Confidence level in your analysis
 - Severity assessment
 - Prioritized recommendations
-- Specific kubectl commands or scripts when applicable
+- Suggested kubectl commands (for manual execution by operators)
 - References to Kubernetes best practices
 
 Focus on practical, implementable solutions that minimize downtime and prevent future incidents.`

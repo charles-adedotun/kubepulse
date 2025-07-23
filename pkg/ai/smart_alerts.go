@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-	
+
 	"k8s.io/klog/v2"
 )
 
@@ -23,17 +23,17 @@ type Alert struct {
 
 // SmartAlertManager provides AI-powered alert management
 type SmartAlertManager struct {
-	client        *Client
-	alertHistory  *AlertHistory
-	correlator    *AlertCorrelator
-	suppressor    *NoiseSuppressor
+	client       *Client
+	alertHistory *AlertHistory
+	correlator   *AlertCorrelator
+	suppressor   *NoiseSuppressor
 }
 
 // AlertHistory tracks alert patterns
 type AlertHistory struct {
-	alerts      []SmartAlert
-	patterns    map[string]*AlertPattern
-	maxHistory  int
+	alerts     []SmartAlert
+	patterns   map[string]*AlertPattern
+	maxHistory int
 }
 
 // AlertPattern represents a recurring alert pattern
@@ -48,25 +48,25 @@ type AlertPattern struct {
 
 // SmartAlert represents an intelligent alert
 type SmartAlert struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Severity     string    `json:"severity"`
-	Message      string    `json:"message"`
-	Resource     string    `json:"resource"`
-	Timestamp    time.Time `json:"timestamp"`
-	
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Severity  string    `json:"severity"`
+	Message   string    `json:"message"`
+	Resource  string    `json:"resource"`
+	Timestamp time.Time `json:"timestamp"`
+
 	// AI enhancements
-	RootCause    string    `json:"root_cause"`
-	Impact       string    `json:"impact"`
-	Correlation  []string  `json:"correlated_alerts"`
-	Suppressed   bool      `json:"suppressed"`
-	Priority     int       `json:"priority"`
-	NoiseScore   float64   `json:"noise_score"`
-	
+	RootCause   string   `json:"root_cause"`
+	Impact      string   `json:"impact"`
+	Correlation []string `json:"correlated_alerts"`
+	Suppressed  bool     `json:"suppressed"`
+	Priority    int      `json:"priority"`
+	NoiseScore  float64  `json:"noise_score"`
+
 	// Smart features
-	AutoResolve  bool      `json:"auto_resolve"`
-	Remediation  string    `json:"suggested_remediation"`
-	TimeToResolve string   `json:"estimated_time_to_resolve"`
+	AutoResolve   bool   `json:"auto_resolve"`
+	Remediation   string `json:"suggested_remediation"`
+	TimeToResolve string `json:"estimated_time_to_resolve"`
 }
 
 // AlertCorrelator correlates related alerts
@@ -123,40 +123,40 @@ func (m *SmartAlertManager) ProcessAlert(ctx context.Context, basicAlert Alert) 
 		Resource:  basicAlert.Source,
 		Timestamp: basicAlert.Timestamp,
 	}
-	
+
 	// AI analysis for root cause
 	rootCause, impact := m.analyzeRootCause(ctx, smartAlert)
 	smartAlert.RootCause = rootCause
 	smartAlert.Impact = impact
-	
+
 	// Find correlated alerts
 	smartAlert.Correlation = m.correlator.findCorrelations(smartAlert, m.alertHistory.alerts)
-	
+
 	// Calculate noise score
 	smartAlert.NoiseScore = m.calculateNoiseScore(smartAlert)
-	
+
 	// Determine if should suppress
 	smartAlert.Suppressed = m.suppressor.shouldSuppress(smartAlert, m.alertHistory.alerts)
-	
+
 	// Calculate priority
 	smartAlert.Priority = m.calculatePriority(smartAlert)
-	
+
 	// Get remediation suggestion
 	if remediation, ttResolve := m.suggestRemediation(ctx, smartAlert); remediation != "" {
 		smartAlert.Remediation = remediation
 		smartAlert.TimeToResolve = ttResolve
 	}
-	
+
 	// Check if can auto-resolve
 	smartAlert.AutoResolve = m.canAutoResolve(smartAlert)
-	
+
 	// Update history and patterns
 	m.updateHistory(smartAlert)
 	m.updatePatterns(smartAlert)
-	
+
 	klog.V(2).Infof("Processed smart alert: %s, priority: %d, noise: %.2f, suppressed: %v",
 		smartAlert.Name, smartAlert.Priority, smartAlert.NoiseScore, smartAlert.Suppressed)
-	
+
 	return &smartAlert, nil
 }
 
@@ -165,7 +165,7 @@ func (m *SmartAlertManager) GetAlertInsights(ctx context.Context) (*AlertInsight
 	patterns := m.identifyPatterns()
 	predictions := m.predictFutureAlerts(ctx)
 	recommendations := m.generateRecommendations(ctx, patterns)
-	
+
 	return &AlertInsights{
 		TopPatterns:     patterns,
 		Predictions:     predictions,
@@ -179,7 +179,7 @@ func (m *SmartAlertManager) GetAlertInsights(ctx context.Context) (*AlertInsight
 func (m *SmartAlertManager) analyzeRootCause(ctx context.Context, alert SmartAlert) (string, string) {
 	// Get recent alerts for context
 	recentAlerts := m.getRecentAlerts(10 * time.Minute)
-	
+
 	prompt := fmt.Sprintf(`Analyze this Kubernetes alert for root cause:
 
 Alert: %s
@@ -196,7 +196,7 @@ Determine:
 
 Be specific and actionable.`,
 		alert.Name, alert.Message, alert.Resource, recentAlerts)
-	
+
 	request := AnalysisRequest{
 		Type:    AnalysisTypeRootCause,
 		Context: prompt,
@@ -206,13 +206,13 @@ Be specific and actionable.`,
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	response, err := m.client.Analyze(ctx, request)
 	if err != nil {
 		klog.Errorf("Root cause analysis failed: %v", err)
 		return "Unknown", "Unknown impact"
 	}
-	
+
 	return response.Summary, response.Diagnosis
 }
 
@@ -220,7 +220,7 @@ Be specific and actionable.`,
 func (m *SmartAlertManager) calculateNoiseScore(alert SmartAlert) float64 {
 	score := 0.0
 	factors := 0
-	
+
 	// Factor 1: Frequency
 	pattern := m.alertHistory.patterns[alert.Name]
 	if pattern != nil {
@@ -229,7 +229,7 @@ func (m *SmartAlertManager) calculateNoiseScore(alert SmartAlert) float64 {
 			factors++
 		}
 	}
-	
+
 	// Factor 2: Auto-resolved quickly
 	similarAlerts := m.findSimilarAlerts(alert, 24*time.Hour)
 	autoResolved := 0
@@ -242,30 +242,30 @@ func (m *SmartAlertManager) calculateNoiseScore(alert SmartAlert) float64 {
 		score += float64(autoResolved) / float64(len(similarAlerts))
 		factors++
 	}
-	
+
 	// Factor 3: Low impact
 	if alert.Severity == "info" || alert.Severity == "warning" {
 		score += 0.5
 		factors++
 	}
-	
+
 	// Factor 4: Known transient issues
 	if m.isTransientIssue(alert) {
 		score += 0.9
 		factors++
 	}
-	
+
 	if factors == 0 {
 		return 0.5 // neutral
 	}
-	
+
 	return score / float64(factors)
 }
 
 // calculatePriority determines alert priority
 func (m *SmartAlertManager) calculatePriority(alert SmartAlert) int {
 	priority := 50 // baseline
-	
+
 	// Severity impact
 	switch alert.Severity {
 	case "critical":
@@ -275,20 +275,20 @@ func (m *SmartAlertManager) calculatePriority(alert SmartAlert) int {
 	case "warning":
 		priority += 10
 	}
-	
+
 	// Noise reduction
 	priority -= int(alert.NoiseScore * 30)
-	
+
 	// Correlation boost
 	priority += len(alert.Correlation) * 5
-	
+
 	// Pattern matching
 	if pattern := m.alertHistory.patterns[alert.Name]; pattern != nil {
 		if pattern.Occurrences > 10 {
 			priority -= 10 // Frequent alerts are less urgent
 		}
 	}
-	
+
 	// Clamp between 1-100
 	if priority < 1 {
 		priority = 1
@@ -296,7 +296,7 @@ func (m *SmartAlertManager) calculatePriority(alert SmartAlert) int {
 	if priority > 100 {
 		priority = 100
 	}
-	
+
 	return priority
 }
 
@@ -315,7 +315,7 @@ Provide:
 
 Be concise and actionable.`,
 		alert.Name, alert.RootCause, alert.Impact)
-	
+
 	request := AnalysisRequest{
 		Type:    AnalysisTypeHealing,
 		Context: prompt,
@@ -324,12 +324,12 @@ Be concise and actionable.`,
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	response, err := m.client.Analyze(ctx, request)
 	if err != nil {
 		return "", ""
 	}
-	
+
 	// Extract time estimate
 	timeEstimate := "Unknown"
 	if strings.Contains(response.Diagnosis, "minutes") {
@@ -337,7 +337,7 @@ Be concise and actionable.`,
 	} else if strings.Contains(response.Diagnosis, "immediate") {
 		timeEstimate = "< 1 minute"
 	}
-	
+
 	return response.Summary, timeEstimate
 }
 
@@ -345,7 +345,7 @@ Be concise and actionable.`,
 
 func (m *SmartAlertManager) updateHistory(alert SmartAlert) {
 	m.alertHistory.alerts = append(m.alertHistory.alerts, alert)
-	
+
 	// Trim history
 	if len(m.alertHistory.alerts) > m.alertHistory.maxHistory {
 		m.alertHistory.alerts = m.alertHistory.alerts[1:]
@@ -361,14 +361,14 @@ func (m *SmartAlertManager) updatePatterns(alert SmartAlert) {
 		}
 		m.alertHistory.patterns[alert.Name] = pattern
 	}
-	
+
 	// Update pattern
 	if pattern.LastSeen.IsZero() {
 		pattern.Frequency = 24 * time.Hour
 	} else {
 		pattern.Frequency = alert.Timestamp.Sub(pattern.LastSeen)
 	}
-	
+
 	pattern.Occurrences++
 	pattern.LastSeen = alert.Timestamp
 	pattern.Correlated = alert.Correlation
@@ -377,7 +377,7 @@ func (m *SmartAlertManager) updatePatterns(alert SmartAlert) {
 func (m *SmartAlertManager) getRecentAlerts(window time.Duration) []SmartAlert {
 	cutoff := time.Now().Add(-window)
 	recent := []SmartAlert{}
-	
+
 	for i := len(m.alertHistory.alerts) - 1; i >= 0; i-- {
 		if m.alertHistory.alerts[i].Timestamp.After(cutoff) {
 			recent = append(recent, m.alertHistory.alerts[i])
@@ -385,22 +385,22 @@ func (m *SmartAlertManager) getRecentAlerts(window time.Duration) []SmartAlert {
 			break
 		}
 	}
-	
+
 	return recent
 }
 
 func (m *SmartAlertManager) findSimilarAlerts(alert SmartAlert, window time.Duration) []SmartAlert {
 	similar := []SmartAlert{}
 	cutoff := time.Now().Add(-window)
-	
+
 	for _, historical := range m.alertHistory.alerts {
-		if historical.Timestamp.After(cutoff) && 
-		   historical.Name == alert.Name &&
-		   historical.Resource == alert.Resource {
+		if historical.Timestamp.After(cutoff) &&
+			historical.Name == alert.Name &&
+			historical.Resource == alert.Resource {
 			similar = append(similar, historical)
 		}
 	}
-	
+
 	return similar
 }
 
@@ -412,14 +412,14 @@ func (m *SmartAlertManager) isTransientIssue(alert SmartAlert) bool {
 		"being terminated",
 		"is starting",
 	}
-	
+
 	message := strings.ToLower(alert.Message)
 	for _, pattern := range transientPatterns {
 		if strings.Contains(message, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -429,31 +429,31 @@ func (m *SmartAlertManager) canAutoResolve(alert SmartAlert) bool {
 	if len(similar) < 3 {
 		return false
 	}
-	
+
 	autoResolved := 0
 	for _, s := range similar {
 		if s.AutoResolve {
 			autoResolved++
 		}
 	}
-	
+
 	return float64(autoResolved)/float64(len(similar)) > 0.8
 }
 
 func (m *SmartAlertManager) identifyPatterns() []AlertPattern {
 	patterns := []AlertPattern{}
-	
+
 	for _, pattern := range m.alertHistory.patterns {
 		if pattern.Occurrences > 5 {
 			patterns = append(patterns, *pattern)
 		}
 	}
-	
+
 	// Sort by frequency
 	sort.Slice(patterns, func(i, j int) bool {
 		return patterns[i].Frequency < patterns[j].Frequency
 	})
-	
+
 	return patterns
 }
 
@@ -471,15 +471,15 @@ func (m *SmartAlertManager) predictFutureAlerts(ctx context.Context) []AlertPred
 
 func (m *SmartAlertManager) generateRecommendations(ctx context.Context, patterns []AlertPattern) []string {
 	recommendations := []string{}
-	
+
 	for _, pattern := range patterns {
 		if pattern.Frequency < 10*time.Minute {
-			recommendations = append(recommendations, 
+			recommendations = append(recommendations,
 				fmt.Sprintf("Alert '%s' fires too frequently (every %v). Consider adjusting thresholds.",
 					pattern.Name, pattern.Frequency))
 		}
 	}
-	
+
 	return recommendations
 }
 
@@ -487,35 +487,35 @@ func (m *SmartAlertManager) calculateNoiseReduction() float64 {
 	if len(m.alertHistory.alerts) == 0 {
 		return 0
 	}
-	
+
 	suppressed := 0
 	for _, alert := range m.getRecentAlerts(24 * time.Hour) {
 		if alert.Suppressed {
 			suppressed++
 		}
 	}
-	
+
 	return float64(suppressed) / float64(len(m.alertHistory.alerts))
 }
 
 func (m *SmartAlertManager) getAlertVolumeStats() map[string]int {
 	stats := make(map[string]int)
-	
+
 	for _, alert := range m.getRecentAlerts(24 * time.Hour) {
 		stats[alert.Severity]++
 	}
-	
+
 	return stats
 }
 
 // Supporting types
 
 type AlertInsights struct {
-	TopPatterns     []AlertPattern     `json:"top_patterns"`
-	Predictions     []AlertPrediction  `json:"predictions"`
-	Recommendations []string           `json:"recommendations"`
-	NoiseReduction  float64            `json:"noise_reduction_rate"`
-	AlertVolume     map[string]int     `json:"alert_volume_by_severity"`
+	TopPatterns     []AlertPattern    `json:"top_patterns"`
+	Predictions     []AlertPrediction `json:"predictions"`
+	Recommendations []string          `json:"recommendations"`
+	NoiseReduction  float64           `json:"noise_reduction_rate"`
+	AlertVolume     map[string]int    `json:"alert_volume_by_severity"`
 }
 
 type AlertPrediction struct {
@@ -534,8 +534,8 @@ func getDefaultSuppressionRules() []SuppressionRule {
 				// Suppress if same alert fired in last minute
 				for i := len(history) - 1; i >= 0; i-- {
 					if history[i].Name == alert.Name &&
-					   history[i].Resource == alert.Resource &&
-					   time.Since(history[i].Timestamp) < time.Minute {
+						history[i].Resource == alert.Resource &&
+						time.Since(history[i].Timestamp) < time.Minute {
 						return true
 					}
 				}
@@ -561,13 +561,13 @@ func (n *NoiseSuppressor) shouldSuppress(alert SmartAlert, history []SmartAlert)
 			return true
 		}
 	}
-	
+
 	// Check threshold
 	threshold, exists := n.thresholds[alert.Severity]
 	if exists && alert.NoiseScore > threshold {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -575,15 +575,15 @@ func (n *NoiseSuppressor) shouldSuppress(alert SmartAlert, history []SmartAlert)
 func (c *AlertCorrelator) findCorrelations(alert SmartAlert, history []SmartAlert) []string {
 	correlated := []string{}
 	cutoff := alert.Timestamp.Add(-c.timeWindow)
-	
+
 	for _, historical := range history {
 		if historical.Timestamp.After(cutoff) &&
-		   historical.ID != alert.ID &&
-		   c.areCorrelated(alert, historical) {
+			historical.ID != alert.ID &&
+			c.areCorrelated(alert, historical) {
 			correlated = append(correlated, historical.ID)
 		}
 	}
-	
+
 	return correlated
 }
 
@@ -592,17 +592,17 @@ func (c *AlertCorrelator) areCorrelated(a1, a2 SmartAlert) bool {
 	if a1.Resource == a2.Resource {
 		return true
 	}
-	
+
 	// Similar root cause
 	if a1.RootCause != "" && a1.RootCause == a2.RootCause {
 		return true
 	}
-	
+
 	// Time proximity
 	timeDiff := math.Abs(a1.Timestamp.Sub(a2.Timestamp).Seconds())
 	if timeDiff < 30 {
 		return true
 	}
-	
+
 	return false
 }

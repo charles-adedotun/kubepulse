@@ -31,7 +31,7 @@ type Engine struct {
 	sloTracker    *slo.Tracker
 	aiClient      *ai.Client
 	errorHandler  *ErrorHandler
-	
+
 	// New AI components
 	predictiveAnalyzer *ai.PredictiveAnalyzer
 	assistant          *ai.Assistant
@@ -41,12 +41,12 @@ type Engine struct {
 
 // EngineConfig holds configuration for the monitoring engine
 type EngineConfig struct {
-	KubeClient   kubernetes.Interface
-	Interval     time.Duration
-	AlertChan    chan Alert
-	MetricsChan  chan Metric
-	EnableAI     bool
-	AIConfig     *ai.Config
+	KubeClient  kubernetes.Interface
+	Interval    time.Duration
+	AlertChan   chan Alert
+	MetricsChan chan Metric
+	EnableAI    bool
+	AIConfig    *ai.Config
 }
 
 // NewEngine creates a new monitoring engine
@@ -93,17 +93,17 @@ func NewEngine(config EngineConfig) *Engine {
 			aiConfig = &ai.Config{} // Use defaults
 		}
 		engine.aiClient = ai.NewClient(*aiConfig)
-		
+
 		// Initialize AI components
 		engine.predictiveAnalyzer = ai.NewPredictiveAnalyzer(engine.aiClient)
 		engine.assistant = ai.NewAssistant(engine.aiClient)
 		engine.smartAlertManager = ai.NewSmartAlertManager(engine.aiClient)
-		
+
 		// Initialize remediation engine with safety checks
 		executor := ai.NewKubectlExecutor("")
 		safetyChecker := ai.NewDefaultSafetyChecker()
 		engine.remediationEngine = ai.NewRemediationEngine(engine.aiClient, executor, safetyChecker)
-		
+
 		klog.Info("AI-powered diagnostics enabled with predictive analytics, assistant, and auto-remediation")
 	}
 
@@ -175,7 +175,7 @@ func (e *Engine) runChecks() {
 				result.Status = HealthStatusUnknown
 				result.Error = err
 				result.Message = fmt.Sprintf("Check failed: %v", err)
-				
+
 				// Create structured error and handle it
 				engineErr := NewHealthCheckError(
 					hc.Name(),
@@ -183,7 +183,7 @@ func (e *Engine) runChecks() {
 					fmt.Sprintf("Health check execution failed: %v", err),
 					err,
 				).WithContext("check_duration", result.Duration)
-				
+
 				if handleErr := e.errorHandler.Handle(engineErr); handleErr != nil {
 					klog.Errorf("Critical health check failure: %v", handleErr)
 				}
@@ -430,7 +430,7 @@ func (e *Engine) runAIAnalysis(result CheckResult) {
 		return
 	}
 
-	klog.Infof("AI Diagnosis for %s: %s (confidence: %.2f)", 
+	klog.Infof("AI Diagnosis for %s: %s (confidence: %.2f)",
 		result.Name, diagnosisResp.Summary, diagnosisResp.Confidence)
 
 	// Run healing analysis if diagnosis confidence is high
@@ -441,7 +441,7 @@ func (e *Engine) runAIAnalysis(result CheckResult) {
 			return
 		}
 
-		klog.Infof("AI Healing suggestions for %s: %d recommendations, %d actions", 
+		klog.Infof("AI Healing suggestions for %s: %d recommendations, %d actions",
 			result.Name, len(healingResp.Recommendations), len(healingResp.Actions))
 
 		// Store AI insights in the result
@@ -499,11 +499,11 @@ func (e *Engine) storeAIInsights(checkName string, diagnosis *ai.AnalysisRespons
 		if result.Details == nil {
 			result.Details = make(map[string]interface{})
 		}
-		
+
 		result.Details["ai_diagnosis"] = diagnosis
 		result.Details["ai_healing"] = healing
 		result.Details["ai_analyzed_at"] = time.Now()
-		
+
 		e.results[checkName] = result
 	}
 }
@@ -524,7 +524,7 @@ func (e *Engine) QueryAssistant(query string) (*ai.QueryResponse, error) {
 	if e.assistant == nil {
 		return nil, fmt.Errorf("AI assistant not enabled")
 	}
-	
+
 	clusterHealth := e.GetClusterHealth("default")
 	aiClusterHealth := e.convertToAIClusterHealth(clusterHealth)
 	return e.assistant.Query(e.ctx, query, &aiClusterHealth)
@@ -535,7 +535,7 @@ func (e *Engine) GetPredictiveInsights() ([]ai.PredictiveInsight, error) {
 	if e.predictiveAnalyzer == nil {
 		return nil, fmt.Errorf("predictive analyzer not enabled")
 	}
-	
+
 	// Collect all metrics
 	metrics := []ai.Metric{}
 	e.resultsMu.RLock()
@@ -552,7 +552,7 @@ func (e *Engine) GetPredictiveInsights() ([]ai.PredictiveInsight, error) {
 		}
 	}
 	e.resultsMu.RUnlock()
-	
+
 	return e.predictiveAnalyzer.AnalyzeTrends(e.ctx, metrics)
 }
 
@@ -561,20 +561,20 @@ func (e *Engine) GetRemediationSuggestions(checkName string) ([]ai.RemediationAc
 	if e.remediationEngine == nil {
 		return nil, fmt.Errorf("remediation engine not enabled")
 	}
-	
+
 	result, exists := e.GetResult(checkName)
 	if !exists {
 		return nil, fmt.Errorf("check result not found: %s", checkName)
 	}
-	
+
 	if result.Status == HealthStatusHealthy {
 		return []ai.RemediationAction{}, nil
 	}
-	
+
 	// Build diagnostic context
 	context := e.buildDiagnosticContext(result)
 	aiResult := e.convertToAICheckResult(result)
-	
+
 	return e.remediationEngine.GenerateRemediation(e.ctx, aiResult, context)
 }
 
@@ -583,7 +583,7 @@ func (e *Engine) ExecuteRemediation(actionID string, dryRun bool) (*ai.Remediati
 	if e.remediationEngine == nil {
 		return nil, fmt.Errorf("remediation engine not enabled")
 	}
-	
+
 	// This would need to store and retrieve actions properly
 	// For now, return error
 	return nil, fmt.Errorf("action retrieval not implemented")
@@ -594,7 +594,7 @@ func (e *Engine) GetSmartAlertInsights() (*ai.AlertInsights, error) {
 	if e.smartAlertManager == nil {
 		return nil, fmt.Errorf("smart alert manager not enabled")
 	}
-	
+
 	return e.smartAlertManager.GetAlertInsights(e.ctx)
 }
 

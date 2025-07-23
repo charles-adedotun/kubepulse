@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	enableHealing     bool
-	diagOutputFormat  string
-	confidenceMin     float64
+	enableHealing    bool
+	diagOutputFormat string
+	confidenceMin    float64
 )
 
 // diagnoseCmd represents the diagnose command
@@ -50,7 +50,7 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 	}
 
 	checkName := args[0]
-	
+
 	client := GetK8sClient()
 	if client == nil {
 		return fmt.Errorf("kubernetes client not initialized")
@@ -73,7 +73,7 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 
 	// Run the specific health check
 	fmt.Printf("🔍 Running health check: %s\n\n", checkName)
-	
+
 	checkResult, err := runSingleHealthCheck(engine, client, checkName, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to run health check: %w", err)
@@ -102,7 +102,7 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 
 	// Check confidence threshold
 	if diagnosisResp.Confidence < confidenceMin {
-		fmt.Printf("⚠️  AI confidence (%.2f) below minimum threshold (%.2f)\n", 
+		fmt.Printf("⚠️  AI confidence (%.2f) below minimum threshold (%.2f)\n",
 			diagnosisResp.Confidence, confidenceMin)
 	}
 
@@ -117,7 +117,7 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 	// Run healing analysis if requested and confidence is sufficient
 	if enableHealing && diagnosisResp.Confidence >= confidenceMin {
 		fmt.Printf("\n🩺 Generating self-healing recommendations...\n")
-		
+
 		healingResp, err := aiClient.AnalyzeHealing(cmd.Context(), &aiCheckResult, diagnosticContext)
 		if err != nil {
 			klog.Errorf("AI healing analysis failed: %v", err)
@@ -137,9 +137,9 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 
 // runSingleHealthCheck executes a single health check
 func runSingleHealthCheck(engine *core.Engine, client kubernetes.Interface, checkName, namespace string) (core.CheckResult, error) {
-	
+
 	var check core.HealthCheck
-	
+
 	switch checkName {
 	case "pod-health":
 		podCheck := health.NewPodHealthCheck()
@@ -149,10 +149,10 @@ func runSingleHealthCheck(engine *core.Engine, client kubernetes.Interface, chec
 			})
 		}
 		check = podCheck
-		
+
 	case "node-health":
 		check = health.NewNodeHealthCheck()
-		
+
 	case "service-health":
 		serviceCheck := health.NewServiceHealthCheck()
 		if namespace != "" {
@@ -161,7 +161,7 @@ func runSingleHealthCheck(engine *core.Engine, client kubernetes.Interface, chec
 			})
 		}
 		check = serviceCheck
-		
+
 	default:
 		return core.CheckResult{}, fmt.Errorf("unknown health check: %s", checkName)
 	}
@@ -207,15 +207,15 @@ func buildDiagnosticContextFromCheck(result core.CheckResult) ai.DiagnosticConte
 func displayHealthCheckResult(result core.CheckResult) {
 	statusIcon := getStatusIcon(result.Status)
 	fmt.Printf("%s %s: %s\n", statusIcon, result.Name, result.Status)
-	
+
 	if result.Message != "" {
 		fmt.Printf("   Message: %s\n", result.Message)
 	}
-	
+
 	if result.Error != nil {
 		fmt.Printf("   Error: %s\n", result.Error.Error())
 	}
-	
+
 	if len(result.Metrics) > 0 {
 		fmt.Printf("   Metrics: %d collected\n", len(result.Metrics))
 	}
@@ -228,11 +228,11 @@ func displayTextDiagnosis(response *ai.AnalysisResponse) {
 	fmt.Printf("Summary: %s\n", response.Summary)
 	fmt.Printf("Confidence: %.2f (%.0f%%)\n", response.Confidence, response.Confidence*100)
 	fmt.Printf("Severity: %s\n", response.Severity)
-	
+
 	if response.Diagnosis != "" {
 		fmt.Printf("\n📝 Detailed Diagnosis:\n%s\n", response.Diagnosis)
 	}
-	
+
 	if len(response.Recommendations) > 0 {
 		fmt.Printf("\n💡 Recommendations:\n")
 		for i, rec := range response.Recommendations {
@@ -251,17 +251,17 @@ func displayTextHealing(response *ai.AnalysisResponse) {
 	fmt.Printf("\n🩺 Self-Healing Suggestions\n")
 	fmt.Printf("──────────────────────────────\n")
 	fmt.Printf("Summary: %s\n", response.Summary)
-	
+
 	if len(response.Actions) > 0 {
 		fmt.Printf("\n🔧 Suggested Actions:\n")
 		for i, action := range response.Actions {
 			fmt.Printf("  %d. %s (%s)\n", i+1, action.Title, action.Type)
 			fmt.Printf("     %s\n", action.Description)
-			
+
 			if action.Command != "" {
 				fmt.Printf("     Command: %s\n", action.Command)
 			}
-			
+
 			if action.RequiresApproval {
 				fmt.Printf("     ⚠️  Requires manual approval\n")
 			} else if action.IsAutomatic {
@@ -270,7 +270,7 @@ func displayTextHealing(response *ai.AnalysisResponse) {
 			fmt.Println()
 		}
 	}
-	
+
 	if len(response.Recommendations) > 0 {
 		fmt.Printf("\n📋 Additional Recommendations:\n")
 		for i, rec := range response.Recommendations {
@@ -285,11 +285,11 @@ func displayJSONOutput(diagnosis *ai.AnalysisResponse, healing *ai.AnalysisRespo
 	output := map[string]interface{}{
 		"diagnosis": diagnosis,
 	}
-	
+
 	if healing != nil {
 		output["healing"] = healing
 	}
-	
+
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(output)
@@ -354,7 +354,7 @@ func extractEvents(result core.CheckResult) []string {
 	return events
 }
 
-// convertCoreToAICheckResult converts core.CheckResult to ai.CheckResult  
+// convertCoreToAICheckResult converts core.CheckResult to ai.CheckResult
 func convertCoreToAICheckResult(result core.CheckResult) ai.CheckResult {
 	aiMetrics := make([]ai.Metric, len(result.Metrics))
 	for i, metric := range result.Metrics {

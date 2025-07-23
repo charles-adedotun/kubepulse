@@ -33,10 +33,10 @@ func (s CircuitState) String() string {
 
 // CircuitBreakerConfig holds configuration for the circuit breaker
 type CircuitBreakerConfig struct {
-	MaxFailures     int           // Number of failures before opening
-	Timeout         time.Duration // How long to wait before trying again
-	ResetTimeout    time.Duration // How long to stay in half-open state
-	OnStateChange   func(from, to CircuitState)
+	MaxFailures   int           // Number of failures before opening
+	Timeout       time.Duration // How long to wait before trying again
+	ResetTimeout  time.Duration // How long to stay in half-open state
+	OnStateChange func(from, to CircuitState)
 }
 
 // CircuitBreaker implements the circuit breaker pattern for AI calls
@@ -74,10 +74,10 @@ func (cb *CircuitBreaker) Execute(ctx context.Context, fn func(context.Context) 
 
 	// Execute the function
 	err := fn(ctx)
-	
+
 	// Handle the result
 	cb.handleResult(err)
-	
+
 	return err
 }
 
@@ -111,7 +111,7 @@ func (cb *CircuitBreaker) handleResult(err error) {
 	if err != nil {
 		cb.failures++
 		cb.lastFailTime = time.Now()
-		
+
 		if cb.state == CircuitHalfOpen {
 			// Failed in half-open state, go back to open
 			cb.setState(CircuitOpen)
@@ -133,10 +133,10 @@ func (cb *CircuitBreaker) handleResult(err error) {
 func (cb *CircuitBreaker) setState(newState CircuitState) {
 	oldState := cb.state
 	cb.state = newState
-	
-	klog.V(2).Infof("Circuit breaker state changed from %s to %s (failures: %d)", 
+
+	klog.V(2).Infof("Circuit breaker state changed from %s to %s (failures: %d)",
 		oldState, newState, cb.failures)
-	
+
 	if cb.config.OnStateChange != nil {
 		go cb.config.OnStateChange(oldState, newState)
 	}
@@ -160,13 +160,13 @@ func (cb *CircuitBreaker) GetFailures() int {
 func (cb *CircuitBreaker) Reset() {
 	cb.mutex.Lock()
 	defer cb.mutex.Unlock()
-	
+
 	oldState := cb.state
 	cb.state = CircuitClosed
 	cb.failures = 0
-	
+
 	klog.V(2).Infof("Circuit breaker manually reset from %s to closed", oldState)
-	
+
 	if cb.config.OnStateChange != nil {
 		go cb.config.OnStateChange(oldState, CircuitClosed)
 	}
@@ -176,12 +176,12 @@ func (cb *CircuitBreaker) Reset() {
 func (cb *CircuitBreaker) GetStats() map[string]interface{} {
 	cb.mutex.RLock()
 	defer cb.mutex.RUnlock()
-	
+
 	return map[string]interface{}{
-		"state":         cb.state.String(),
-		"failures":      cb.failures,
-		"max_failures":  cb.config.MaxFailures,
-		"last_failure":  cb.lastFailTime,
-		"timeout":       cb.config.Timeout.String(),
+		"state":        cb.state.String(),
+		"failures":     cb.failures,
+		"max_failures": cb.config.MaxFailures,
+		"last_failure": cb.lastFailTime,
+		"timeout":      cb.config.Timeout.String(),
 	}
 }

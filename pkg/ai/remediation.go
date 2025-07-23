@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	
+
 	"k8s.io/klog/v2"
 )
 
@@ -48,15 +48,15 @@ type RemediationRecord struct {
 
 // RemediationAction represents an AI-suggested remediation
 type RemediationAction struct {
-	ID          string   `json:"id"`
-	Type        string   `json:"type"`
-	Description string   `json:"description"`
-	Commands    []string `json:"commands"`
-	Risk        RiskLevel `json:"risk"`
-	Confidence  float64  `json:"confidence"`
-	Impact      string   `json:"impact"`
-	Rollback    string   `json:"rollback_command"`
-	RequiresApproval bool `json:"requires_approval"`
+	ID               string    `json:"id"`
+	Type             string    `json:"type"`
+	Description      string    `json:"description"`
+	Commands         []string  `json:"commands"`
+	Risk             RiskLevel `json:"risk"`
+	Confidence       float64   `json:"confidence"`
+	Impact           string    `json:"impact"`
+	Rollback         string    `json:"rollback_command"`
+	RequiresApproval bool      `json:"requires_approval"`
 }
 
 // RiskLevel represents the risk of a remediation action
@@ -84,7 +84,7 @@ func NewRemediationEngine(client *Client, executor CommandExecutor, checker Safe
 // GenerateRemediation creates AI-powered remediation plan
 func (r *RemediationEngine) GenerateRemediation(ctx context.Context, issue CheckResult, context DiagnosticContext) ([]RemediationAction, error) {
 	klog.V(2).Infof("Generating remediation for issue: %s", issue.Name)
-	
+
 	prompt := fmt.Sprintf(`Generate remediation actions for this Kubernetes issue:
 
 Issue: %s
@@ -115,7 +115,7 @@ Format as JSON array.`,
 		issue.Name, issue.Status, issue.Message,
 		context.ErrorLogs, context.Events,
 		context.ResourceType, context.ResourceName)
-	
+
 	request := AnalysisRequest{
 		Type:        AnalysisTypeHealing,
 		Context:     prompt,
@@ -125,15 +125,15 @@ Format as JSON array.`,
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	response, err := r.client.Analyze(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("remediation generation failed: %w", err)
 	}
-	
+
 	// Parse remediation actions
 	actions := r.parseRemediationActions(response)
-	
+
 	// Validate safety of each action
 	validatedActions := []RemediationAction{}
 	for _, action := range actions {
@@ -143,7 +143,7 @@ Format as JSON array.`,
 			klog.Warningf("Rejected unsafe remediation: %s, reason: %s", action.Description, reason)
 		}
 	}
-	
+
 	return validatedActions, nil
 }
 
@@ -154,7 +154,7 @@ func (r *RemediationEngine) ExecuteRemediation(ctx context.Context, action Remed
 		Timestamp: time.Now(),
 		Action:    action,
 	}
-	
+
 	// Safety validation
 	if err := r.validateAction(action); err != nil {
 		record.Success = false
@@ -162,41 +162,41 @@ func (r *RemediationEngine) ExecuteRemediation(ctx context.Context, action Remed
 		r.history.actions = append(r.history.actions, record)
 		return &record, err
 	}
-	
+
 	// Execute commands
 	results := []string{}
 	for _, cmd := range action.Commands {
 		var result string
 		var err error
-		
+
 		if dryRun {
 			result, err = r.executor.DryRun(ctx, cmd)
 		} else {
 			result, err = r.executor.Execute(ctx, cmd)
 		}
-		
+
 		if err != nil {
 			record.Success = false
 			record.Result = fmt.Sprintf("Command failed: %s, error: %v", cmd, err)
-			
+
 			// Attempt rollback if not in dry-run
 			if !dryRun && record.RollbackCmd != "" {
 				r.attemptRollback(ctx, record.RollbackCmd)
 			}
-			
+
 			r.history.actions = append(r.history.actions, record)
 			return &record, err
 		}
-		
+
 		results = append(results, result)
 	}
-	
+
 	record.Success = true
 	record.Result = strings.Join(results, "\n")
 	r.history.actions = append(r.history.actions, record)
-	
+
 	klog.Infof("Successfully executed remediation: %s", action.Description)
-	
+
 	return &record, nil
 }
 
@@ -204,7 +204,7 @@ func (r *RemediationEngine) ExecuteRemediation(ctx context.Context, action Remed
 func (r *RemediationEngine) GetSmartRecommendations(ctx context.Context, health *ClusterHealth) ([]RemediationAction, error) {
 	// Analyze patterns in failures
 	patterns := r.analyzeFailurePatterns(health)
-	
+
 	prompt := fmt.Sprintf(`Based on these Kubernetes cluster patterns, suggest proactive remediations:
 
 Failure Patterns:
@@ -221,19 +221,19 @@ Suggest preventive actions that:
 
 Focus on automation-friendly actions.`,
 		patterns, r.getRecentHistory(10))
-	
+
 	request := AnalysisRequest{
 		Type:        AnalysisTypeHealing,
 		Context:     prompt,
 		ClusterInfo: health,
 		Timestamp:   time.Now(),
 	}
-	
+
 	response, err := r.client.Analyze(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return r.parseRemediationActions(response), nil
 }
 
@@ -243,7 +243,7 @@ func (r *RemediationEngine) LearnFromOutcome(ctx context.Context, recordID strin
 	if record == nil {
 		return
 	}
-	
+
 	// Update AI context with outcome
 	feedback := map[string]interface{}{
 		"action":     record.Action,
@@ -251,7 +251,7 @@ func (r *RemediationEngine) LearnFromOutcome(ctx context.Context, recordID strin
 		"successful": successful,
 		"timestamp":  time.Now(),
 	}
-	
+
 	prompt := fmt.Sprintf(`Learn from this remediation outcome:
 Action: %+v
 Success: %v
@@ -262,7 +262,7 @@ Update your knowledge to:
 2. Adjust confidence scores
 3. Refine risk assessments`,
 		record.Action, successful, outcome)
-	
+
 	request := AnalysisRequest{
 		Type:    "learning",
 		Context: prompt,
@@ -271,7 +271,7 @@ Update your knowledge to:
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	// Fire and forget - learning happens async
 	go func() {
 		if _, err := r.client.Analyze(context.Background(), request); err != nil {
@@ -284,27 +284,27 @@ Update your knowledge to:
 
 func (r *RemediationEngine) parseRemediationActions(response *AnalysisResponse) []RemediationAction {
 	actions := []RemediationAction{}
-	
+
 	for i, suggestedAction := range response.Actions {
 		action := RemediationAction{
-			ID:          fmt.Sprintf("action-%d-%d", time.Now().Unix(), i),
-			Type:        string(suggestedAction.Type),
-			Description: suggestedAction.Description,
-			Commands:    r.extractCommands(suggestedAction),
-			Risk:        r.assessRisk(suggestedAction),
-			Confidence:  response.Confidence,
-			Impact:      r.assessImpact(suggestedAction),
+			ID:               fmt.Sprintf("action-%d-%d", time.Now().Unix(), i),
+			Type:             string(suggestedAction.Type),
+			Description:      suggestedAction.Description,
+			Commands:         r.extractCommands(suggestedAction),
+			Risk:             r.assessRisk(suggestedAction),
+			Confidence:       response.Confidence,
+			Impact:           r.assessImpact(suggestedAction),
 			RequiresApproval: suggestedAction.RequiresApproval,
 		}
-		
+
 		// Generate rollback command
 		if rollback := r.generateRollback(action); rollback != "" {
 			action.Rollback = rollback
 		}
-		
+
 		actions = append(actions, action)
 	}
-	
+
 	return actions
 }
 
@@ -368,12 +368,12 @@ func (r *RemediationEngine) validateAction(action RemediationAction) error {
 			return fmt.Errorf("invalid command: %w", err)
 		}
 	}
-	
+
 	// Check risk vs confidence
 	if action.Risk == RiskHigh && action.Confidence < 0.8 {
 		return fmt.Errorf("high risk action with low confidence (%.2f)", action.Confidence)
 	}
-	
+
 	return nil
 }
 
@@ -386,11 +386,11 @@ func (r *RemediationEngine) attemptRollback(ctx context.Context, rollbackCmd str
 
 func (r *RemediationEngine) analyzeFailurePatterns(health *ClusterHealth) map[string]int {
 	patterns := make(map[string]int)
-	
+
 	for _, check := range health.Checks {
 		if check.Status != HealthStatusHealthy {
 			patterns[check.Name]++
-			
+
 			// Extract pattern from message
 			if strings.Contains(check.Message, "OOMKilled") {
 				patterns["memory_issues"]++
@@ -403,7 +403,7 @@ func (r *RemediationEngine) analyzeFailurePatterns(health *ClusterHealth) map[st
 			}
 		}
 	}
-	
+
 	return patterns
 }
 

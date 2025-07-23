@@ -18,15 +18,15 @@ import (
 
 // Server handles HTTP API requests
 type Server struct {
-	engine     *core.Engine
-	router     *mux.Router
-	server     *http.Server
-	upgrader   websocket.Upgrader
-	clients    map[*websocket.Conn]bool
-	clientsMu  sync.RWMutex
-	shutdown   chan struct{}
-	ctx        context.Context
-	cancel     context.CancelFunc
+	engine    *core.Engine
+	router    *mux.Router
+	server    *http.Server
+	upgrader  websocket.Upgrader
+	clients   map[*websocket.Conn]bool
+	clientsMu sync.RWMutex
+	shutdown  chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // spaHandler implements a single-page application handler
@@ -45,7 +45,7 @@ type Config struct {
 func NewServer(config Config) *Server {
 	router := mux.NewRouter()
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	server := &Server{
 		engine: config.Engine,
 		router: router,
@@ -66,12 +66,12 @@ func NewServer(config Config) *Server {
 		ctx:      ctx,
 		cancel:   cancel,
 	}
-	
+
 	server.setupRoutes()
-	
+
 	// Start WebSocket client cleanup routine
 	go server.cleanupClients()
-	
+
 	return server
 }
 
@@ -91,9 +91,9 @@ func (s *Server) Stop(ctx context.Context) error {
 func (s *Server) setupRoutes() {
 	// Add CORS middleware first
 	s.router.Use(s.corsMiddleware)
-	
+
 	klog.Info("Setting up API routes")
-	
+
 	// API v1 routes
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
@@ -105,7 +105,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/ai/insights", s.handleAIInsights).Methods("GET")
 	api.HandleFunc("/ai/analyze/{check}", s.handleAIAnalyze).Methods("POST")
 	api.HandleFunc("/ai/heal/{check}", s.handleAIHeal).Methods("POST")
-	
+
 	// Register new AI routes on the api subrouter
 	aiApi := api.PathPrefix("/ai").Subrouter()
 	// Assistant endpoints
@@ -117,12 +117,12 @@ func (s *Server) setupRoutes() {
 	aiApi.HandleFunc("/remediation/execute", s.HandleExecuteRemediation).Methods("POST")
 	// Smart alerts
 	aiApi.HandleFunc("/alerts/insights", s.HandleSmartAlerts).Methods("GET")
-	
+
 	klog.Info("AI API routes registered at /api/v1/ai/*")
-	
+
 	// WebSocket endpoint
 	s.router.HandleFunc("/ws", s.handleWebSocket)
-	
+
 	// Static files for web dashboard - MUST BE LAST
 	// First check if frontend build exists
 	frontendBuildPath := "./frontend/dist"
@@ -152,7 +152,7 @@ func (s *Server) handleClusterHealth(w http.ResponseWriter, r *http.Request) {
 	if clusterName == "" {
 		clusterName = "default"
 	}
-	
+
 	health := s.engine.GetClusterHealth(clusterName)
 	s.writeJSON(w, health)
 }
@@ -167,13 +167,13 @@ func (s *Server) handleHealthChecks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	checkName := vars["name"]
-	
+
 	result, exists := s.engine.GetResult(checkName)
 	if !exists {
 		http.Error(w, "Health check not found", http.StatusNotFound)
 		return
 	}
-	
+
 	s.writeJSON(w, result)
 }
 
@@ -182,9 +182,9 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	// TODO: Implement alert history from alert manager
 	alerts := []map[string]interface{}{
 		{
-			"id":       "example-1",
-			"severity": "warning",
-			"message":  "Example alert",
+			"id":        "example-1",
+			"severity":  "warning",
+			"message":   "Example alert",
 			"timestamp": time.Now(),
 		},
 	}
@@ -194,9 +194,9 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 // handleMetrics returns Prometheus-compatible metrics
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	
+
 	results := s.engine.GetResults()
-	
+
 	for _, result := range results {
 		for _, metric := range result.Metrics {
 			// Convert to Prometheus format
@@ -210,12 +210,12 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			if labels != "" {
 				labels = "{" + labels + "}"
 			}
-			
+
 			fmt.Fprintf(w, "# TYPE %s %s\n", metric.Name, string(metric.Type))
-			fmt.Fprintf(w, "%s%s %f %d\n", 
-				metric.Name, 
-				labels, 
-				metric.Value, 
+			fmt.Fprintf(w, "%s%s %f %d\n",
+				metric.Name,
+				labels,
+				metric.Value,
 				metric.Timestamp.Unix()*1000)
 		}
 	}
@@ -229,12 +229,12 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
+
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -253,13 +253,13 @@ func (s *Server) handleAIInsights(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAIAnalyze(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	checkName := vars["check"]
-	
+
 	result, exists := s.engine.GetResult(checkName)
 	if !exists {
 		http.Error(w, "Health check not found", http.StatusNotFound)
 		return
 	}
-	
+
 	// Extract AI diagnosis from stored insights
 	if result.Details != nil {
 		if diagnosis, exists := result.Details["ai_diagnosis"]; exists {
@@ -267,7 +267,7 @@ func (s *Server) handleAIAnalyze(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Return message if no AI analysis available
 	response := map[string]interface{}{
 		"message": "AI analysis not available for this health check",
@@ -281,13 +281,13 @@ func (s *Server) handleAIAnalyze(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAIHeal(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	checkName := vars["check"]
-	
+
 	result, exists := s.engine.GetResult(checkName)
 	if !exists {
 		http.Error(w, "Health check not found", http.StatusNotFound)
 		return
 	}
-	
+
 	// Extract AI healing suggestions from stored insights
 	if result.Details != nil {
 		if healing, exists := result.Details["ai_healing"]; exists {
@@ -295,7 +295,7 @@ func (s *Server) handleAIHeal(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Return message if no healing suggestions available
 	response := map[string]interface{}{
 		"message": "AI healing suggestions not available for this health check",
@@ -317,7 +317,7 @@ func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get the absolute path to prevent directory traversal
 	path := filepath.Join(h.path, r.URL.Path)
-	
+
 	// Check if file exists
 	fi, err := os.Stat(path)
 	if os.IsNotExist(err) || fi.IsDir() {
@@ -325,7 +325,7 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, filepath.Join(h.path, "index.html"))
 		return
 	}
-	
+
 	// Otherwise, serve the file normally
 	h.handler.ServeHTTP(w, r)
 }
@@ -383,7 +383,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 func (s *Server) removeClient(conn *websocket.Conn) {
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
-	
+
 	if _, exists := s.clients[conn]; exists {
 		delete(s.clients, conn)
 		klog.V(2).Infof("WebSocket client disconnected. Total clients: %d", len(s.clients))
@@ -418,7 +418,7 @@ func (s *Server) cleanupClients() {
 		case <-ticker.C:
 			s.clientsMu.Lock()
 			var deadConnections []*websocket.Conn
-			
+
 			for conn := range s.clients {
 				// Try to ping the connection
 				conn.SetWriteDeadline(time.Now().Add(time.Second))
@@ -426,19 +426,19 @@ func (s *Server) cleanupClients() {
 					deadConnections = append(deadConnections, conn)
 				}
 			}
-			
+
 			// Remove dead connections
 			for _, conn := range deadConnections {
 				delete(s.clients, conn)
 				conn.Close()
 			}
-			
+
 			if len(deadConnections) > 0 {
-				klog.V(2).Infof("Cleaned up %d dead WebSocket connections. Active: %d", 
+				klog.V(2).Infof("Cleaned up %d dead WebSocket connections. Active: %d",
 					len(deadConnections), len(s.clients))
 			}
 			s.clientsMu.Unlock()
-			
+
 		case <-s.ctx.Done():
 			return
 		}
@@ -449,13 +449,13 @@ func (s *Server) cleanupClients() {
 func (s *Server) BroadcastToClients(data interface{}) {
 	s.clientsMu.RLock()
 	defer s.clientsMu.RUnlock()
-	
+
 	if len(s.clients) == 0 {
 		return
 	}
-	
+
 	var deadConnections []*websocket.Conn
-	
+
 	for conn := range s.clients {
 		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		if err := conn.WriteJSON(data); err != nil {
@@ -463,7 +463,7 @@ func (s *Server) BroadcastToClients(data interface{}) {
 			deadConnections = append(deadConnections, conn)
 		}
 	}
-	
+
 	// Clean up dead connections (but don't modify map during read lock)
 	if len(deadConnections) > 0 {
 		go func() {
@@ -478,20 +478,20 @@ func (s *Server) BroadcastToClients(data interface{}) {
 // Shutdown gracefully shuts down the server and cleans up WebSocket connections
 func (s *Server) Shutdown(ctx context.Context) error {
 	klog.Info("Shutting down API server...")
-	
+
 	// Signal shutdown to all goroutines
 	s.cancel()
-	
+
 	// Close all WebSocket connections
 	s.clientsMu.Lock()
 	for conn := range s.clients {
-		conn.WriteMessage(websocket.CloseMessage, 
+		conn.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseGoingAway, "Server shutting down"))
 		conn.Close()
 	}
 	s.clients = make(map[*websocket.Conn]bool)
 	s.clientsMu.Unlock()
-	
+
 	// Shutdown HTTP server
 	return s.server.Shutdown(ctx)
 }

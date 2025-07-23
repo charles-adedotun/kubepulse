@@ -6,39 +6,39 @@ import (
 
 // AnalysisRequest represents a request for AI analysis
 type AnalysisRequest struct {
-	Type        AnalysisType               `json:"type"`
-	Context     string                     `json:"context"`
-	Data        map[string]interface{}     `json:"data"`
-	HealthCheck *CheckResult               `json:"health_check,omitempty"`
-	ClusterInfo *ClusterHealth             `json:"cluster_info,omitempty"`
-	Timestamp   time.Time                  `json:"timestamp"`
+	Type        AnalysisType           `json:"type"`
+	Context     string                 `json:"context"`
+	Data        map[string]interface{} `json:"data"`
+	HealthCheck *CheckResult           `json:"health_check,omitempty"`
+	ClusterInfo *ClusterHealth         `json:"cluster_info,omitempty"`
+	Timestamp   time.Time              `json:"timestamp"`
 }
 
 // AnalysisType defines the type of AI analysis to perform
 type AnalysisType string
 
 const (
-	AnalysisTypeDiagnostic    AnalysisType = "diagnostic"
-	AnalysisTypeHealing       AnalysisType = "healing"
-	AnalysisTypePredictive    AnalysisType = "predictive"
-	AnalysisTypeOptimization  AnalysisType = "optimization"
-	AnalysisTypeSummary       AnalysisType = "summary"
-	AnalysisTypeRootCause     AnalysisType = "root_cause"
+	AnalysisTypeDiagnostic   AnalysisType = "diagnostic"
+	AnalysisTypeHealing      AnalysisType = "healing"
+	AnalysisTypePredictive   AnalysisType = "predictive"
+	AnalysisTypeOptimization AnalysisType = "optimization"
+	AnalysisTypeSummary      AnalysisType = "summary"
+	AnalysisTypeRootCause    AnalysisType = "root_cause"
 )
 
 // AnalysisResponse represents the AI's analysis response
 type AnalysisResponse struct {
-	ID            string                 `json:"id"`
-	Type          AnalysisType           `json:"type"`
-	Summary       string                 `json:"summary"`
-	Diagnosis     string                 `json:"diagnosis"`
-	Confidence    float64                `json:"confidence"`
-	Severity      SeverityLevel          `json:"severity"`
-	Recommendations []Recommendation     `json:"recommendations"`
-	Actions       []SuggestedAction      `json:"actions"`
-	Context       map[string]interface{} `json:"context"`
-	Timestamp     time.Time              `json:"timestamp"`
-	Duration      time.Duration          `json:"duration"`
+	ID              string                 `json:"id"`
+	Type            AnalysisType           `json:"type"`
+	Summary         string                 `json:"summary"`
+	Diagnosis       string                 `json:"diagnosis"`
+	Confidence      float64                `json:"confidence"`
+	Severity        SeverityLevel          `json:"severity"`
+	Recommendations []Recommendation       `json:"recommendations"`
+	Actions         []SuggestedAction      `json:"actions"`
+	Context         map[string]interface{} `json:"context"`
+	Timestamp       time.Time              `json:"timestamp"`
+	Duration        time.Duration          `json:"duration"`
 }
 
 // SeverityLevel represents the severity of an issue
@@ -66,55 +66,55 @@ type Recommendation struct {
 
 // SuggestedAction represents an actionable item
 type SuggestedAction struct {
-	ID          string            `json:"id"`
-	Type        ActionType        `json:"type"`
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Command     string            `json:"command,omitempty"`
-	Script      string            `json:"script,omitempty"`
-	IsAutomatic bool              `json:"is_automatic"`
-	RequiresApproval bool         `json:"requires_approval"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	ID               string            `json:"id"`
+	Type             ActionType        `json:"type"`
+	Title            string            `json:"title"`
+	Description      string            `json:"description"`
+	Command          string            `json:"command,omitempty"`
+	Script           string            `json:"script,omitempty"`
+	IsAutomatic      bool              `json:"is_automatic"`
+	RequiresApproval bool              `json:"requires_approval"`
+	Metadata         map[string]string `json:"metadata,omitempty"`
 }
 
 // ActionType defines the type of suggested action
 type ActionType string
 
 const (
-	ActionTypeKubectl     ActionType = "kubectl"
-	ActionTypeScript      ActionType = "script"
-	ActionTypeManual      ActionType = "manual"
-	ActionTypeRestart     ActionType = "restart"
-	ActionTypeScale       ActionType = "scale"
+	ActionTypeKubectl       ActionType = "kubectl"
+	ActionTypeScript        ActionType = "script"
+	ActionTypeManual        ActionType = "manual"
+	ActionTypeRestart       ActionType = "restart"
+	ActionTypeScale         ActionType = "scale"
 	ActionTypeConfiguration ActionType = "configuration"
-	ActionTypeInvestigate ActionType = "investigate"
+	ActionTypeInvestigate   ActionType = "investigate"
 )
 
 // InsightSummary represents aggregated AI insights
 type InsightSummary struct {
-	OverallHealth    string                 `json:"overall_health"`
-	CriticalIssues   int                    `json:"critical_issues"`
-	Recommendations  []Recommendation       `json:"top_recommendations"`
-	TrendAnalysis    string                 `json:"trend_analysis"`
-	PredictedIssues  []string               `json:"predicted_issues"`
-	HealthScore      float64                `json:"health_score"`
-	AIConfidence     float64                `json:"ai_confidence"`
-	LastAnalyzed     time.Time              `json:"last_analyzed"`
-	Context          map[string]interface{} `json:"context"`
+	OverallHealth   string                 `json:"overall_health"`
+	CriticalIssues  int                    `json:"critical_issues"`
+	Recommendations []Recommendation       `json:"top_recommendations"`
+	TrendAnalysis   string                 `json:"trend_analysis"`
+	PredictedIssues []string               `json:"predicted_issues"`
+	HealthScore     float64                `json:"health_score"`
+	AIConfidence    float64                `json:"ai_confidence"`
+	LastAnalyzed    time.Time              `json:"last_analyzed"`
+	Context         map[string]interface{} `json:"context"`
 }
 
 // DiagnosticContext provides context for AI analysis
 type DiagnosticContext struct {
-	ClusterName     string                    `json:"cluster_name"`
-	Namespace       string                    `json:"namespace,omitempty"`
-	ResourceType    string                    `json:"resource_type,omitempty"`
-	ResourceName    string                    `json:"resource_name,omitempty"`
-	ErrorLogs       []string                  `json:"error_logs,omitempty"`
-	Events          []string                  `json:"events,omitempty"`
-	Metrics         []Metric                  `json:"metrics,omitempty"`
-	RelatedChecks   []CheckResult             `json:"related_checks,omitempty"`
-	HistoricalData  []CheckResult             `json:"historical_data,omitempty"`
-	ClusterState    map[string]interface{}    `json:"cluster_state,omitempty"`
+	ClusterName    string                 `json:"cluster_name"`
+	Namespace      string                 `json:"namespace,omitempty"`
+	ResourceType   string                 `json:"resource_type,omitempty"`
+	ResourceName   string                 `json:"resource_name,omitempty"`
+	ErrorLogs      []string               `json:"error_logs,omitempty"`
+	Events         []string               `json:"events,omitempty"`
+	Metrics        []Metric               `json:"metrics,omitempty"`
+	RelatedChecks  []CheckResult          `json:"related_checks,omitempty"`
+	HistoricalData []CheckResult          `json:"historical_data,omitempty"`
+	ClusterState   map[string]interface{} `json:"cluster_state,omitempty"`
 }
 
 // Local type definitions to avoid import cycles

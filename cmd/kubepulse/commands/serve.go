@@ -61,7 +61,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		ClaudePath: "claude", // Assume claude is in PATH
 		MaxTurns:   3,
 	}
-	
+
 	engineConfig := core.EngineConfig{
 		KubeClient:  client,
 		Interval:    interval,
@@ -167,11 +167,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Stop components gracefully
 	cancel()
-	
+
 	// Stop API server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
-	
+
 	if err := apiServer.Stop(shutdownCtx); err != nil {
 		klog.Errorf("Error stopping API server: %v", err)
 	}

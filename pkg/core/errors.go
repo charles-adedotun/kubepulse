@@ -19,12 +19,12 @@ const (
 type ErrorCategory string
 
 const (
-	ErrorCategoryHealth       ErrorCategory = "health_check"
-	ErrorCategoryAI           ErrorCategory = "ai_analysis"
-	ErrorCategoryAPI          ErrorCategory = "api"
-	ErrorCategoryKubernetes   ErrorCategory = "kubernetes"
+	ErrorCategoryHealth        ErrorCategory = "health_check"
+	ErrorCategoryAI            ErrorCategory = "ai_analysis"
+	ErrorCategoryAPI           ErrorCategory = "api"
+	ErrorCategoryKubernetes    ErrorCategory = "kubernetes"
 	ErrorCategoryConfiguration ErrorCategory = "configuration"
-	ErrorCategorySystem       ErrorCategory = "system"
+	ErrorCategorySystem        ErrorCategory = "system"
 )
 
 // EngineError represents a structured error with context
@@ -45,10 +45,10 @@ type EngineError struct {
 // Error implements the error interface
 func (e *EngineError) Error() string {
 	if e.Cause != nil {
-		return fmt.Sprintf("[%s] %s.%s: %s (caused by: %v)", 
+		return fmt.Sprintf("[%s] %s.%s: %s (caused by: %v)",
 			e.Severity, e.Component, e.Operation, e.Message, e.Cause)
 	}
-	return fmt.Sprintf("[%s] %s.%s: %s", 
+	return fmt.Sprintf("[%s] %s.%s: %s",
 		e.Severity, e.Component, e.Operation, e.Message)
 }
 
@@ -115,17 +115,17 @@ func NewErrorHandler(maxErrors int, callback func(EngineError)) *ErrorHandler {
 func (h *ErrorHandler) Handle(err *EngineError) error {
 	// Add to error history
 	h.addError(*err)
-	
+
 	// Execute callback if provided
 	if h.errorCallback != nil {
 		h.errorCallback(*err)
 	}
-	
+
 	// Determine if we should continue or fail
 	if err.IsCritical() {
 		return fmt.Errorf("critical error encountered: %w", err)
 	}
-	
+
 	// For recoverable errors, log and continue
 	return nil
 }
@@ -135,12 +135,12 @@ func (h *ErrorHandler) GetRecentErrors(limit int) []EngineError {
 	if limit > len(h.errors) {
 		limit = len(h.errors)
 	}
-	
+
 	start := len(h.errors) - limit
 	if start < 0 {
 		start = 0
 	}
-	
+
 	return h.errors[start:]
 }
 
@@ -158,7 +158,7 @@ func (h *ErrorHandler) GetErrorsByCategory(category ErrorCategory) []EngineError
 // addError adds an error to the history with size management
 func (h *ErrorHandler) addError(err EngineError) {
 	h.errors = append(h.errors, err)
-	
+
 	// Maintain maximum size
 	if len(h.errors) > h.maxErrors {
 		h.errors = h.errors[1:]
