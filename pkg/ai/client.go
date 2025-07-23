@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -38,7 +37,7 @@ func NewClient(config Config) *Client {
 		config.MaxTurns = 3
 	}
 	if config.Timeout == 0 {
-		config.Timeout = 60 * time.Second
+		config.Timeout = 120 * time.Second
 	}
 	if config.SystemPrompt == "" {
 		config.SystemPrompt = getDefaultSystemPrompt()
@@ -55,11 +54,6 @@ func NewClient(config Config) *Client {
 // Analyze performs AI analysis on the given request
 func (c *Client) Analyze(ctx context.Context, request AnalysisRequest) (*AnalysisResponse, error) {
 	start := time.Now()
-	
-	// Check for mock mode
-	if os.Getenv("KUBEPULSE_AI_MOCK") == "true" {
-		return c.getMockAnalysisResponse(request), nil
-	}
 	
 	prompt, err := c.buildPrompt(request)
 	if err != nil {
@@ -121,11 +115,6 @@ func (c *Client) AnalyzeHealing(ctx context.Context, checkResult *CheckResult, c
 
 // AnalyzeCluster performs comprehensive cluster analysis
 func (c *Client) AnalyzeCluster(ctx context.Context, clusterHealth *ClusterHealth) (*InsightSummary, error) {
-	// For testing/demo: return mock data if KUBEPULSE_AI_MOCK is set or if Claude is not available
-	if os.Getenv("KUBEPULSE_AI_MOCK") == "true" {
-		return c.getMockInsights(clusterHealth), nil
-	}
-
 	request := AnalysisRequest{
 		Type:        AnalysisTypeSummary,
 		Context:     "Comprehensive Kubernetes cluster health analysis and insights",
@@ -139,8 +128,7 @@ func (c *Client) AnalyzeCluster(ctx context.Context, clusterHealth *ClusterHealt
 
 	response, err := c.Analyze(ctx, request)
 	if err != nil {
-		klog.Warningf("AI analysis failed, using mock data: %v", err)
-		return c.getMockInsights(clusterHealth), nil
+		return nil, fmt.Errorf("AI analysis failed: %w", err)
 	}
 
 	// Convert to InsightSummary
@@ -165,7 +153,6 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 
 	args := []string{
 		"-p", prompt,
-		"--output-format", "json",
 		"--max-turns", fmt.Sprintf("%d", c.maxTurns),
 		"--system-prompt", c.systemPrompt,
 	}
@@ -232,24 +219,16 @@ func (c *Client) buildPrompt(request AnalysisRequest) (string, error) {
 	return prompt.String(), nil
 }
 
-// parseResponse parses the Claude CLI JSON response
+// parseResponse parses the Claude CLI response
 func (c *Client) parseResponse(result string, request AnalysisRequest) (*AnalysisResponse, error) {
-	var claudeResult struct {
-		Result string `json:"result"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &claudeResult); err != nil {
-		return nil, fmt.Errorf("failed to parse claude response: %w", err)
-	}
-
-	// Try to parse structured response from Claude's result
+	// Claude CLI returns the response directly, not wrapped in a JSON structure
 	response := &AnalysisResponse{
-		Summary:         extractSummary(claudeResult.Result),
-		Diagnosis:       extractDiagnosis(claudeResult.Result),
-		Confidence:      extractConfidence(claudeResult.Result),
-		Severity:        extractSeverity(claudeResult.Result),
-		Recommendations: extractRecommendations(claudeResult.Result),
-		Actions:         extractActions(claudeResult.Result),
+		Summary:         extractSummary(result),
+		Diagnosis:       extractDiagnosis(result),
+		Confidence:      extractConfidence(result),
+		Severity:        extractSeverity(result),
+		Recommendations: extractRecommendations(result),
+		Actions:         extractActions(result),
 		Context:         make(map[string]interface{}),
 	}
 
