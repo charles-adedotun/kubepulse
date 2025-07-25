@@ -73,7 +73,7 @@ export function useWebSocket() {
     }
   }
 
-  const attemptReconnect = () => {
+  const attemptReconnect = useCallback(() => {
     if (reconnectAttemptsRef.current < config.ui.maxReconnectAttempts) {
       reconnectAttemptsRef.current++
       console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${config.ui.maxReconnectAttempts})...`)
@@ -82,7 +82,7 @@ export function useWebSocket() {
         connect()
       }, config.ui.reconnectDelay)
     }
-  }, [])
+  }, [connect])
 
   useEffect(() => {
     connect()

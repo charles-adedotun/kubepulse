@@ -2,7 +2,7 @@ import { Header } from '@/components/layout/Header'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { StatusCard } from '@/components/dashboard/StatusCard'
 import { HealthChecksTable } from '@/components/dashboard/HealthChecksTable'
-import { EnhancedMetricsGrid } from '@/components/dashboard/EnhancedMetricsGrid'
+import { EnhancedMetricsGrid, type EnhancedMetric } from '@/components/dashboard/EnhancedMetricsGrid'
 import { AIInsights } from '@/components/dashboard/AIInsights'
 import { NodeDetailsPanel } from '@/components/dashboard/NodeDetailsPanel'
 import { PredictiveAnalytics } from '@/components/dashboard/PredictiveAnalytics'
@@ -24,14 +24,6 @@ interface MetricLabels {
   node?: string
 }
 
-interface EnhancedMetric {
-  name: string
-  value: number
-  unit: string
-  labels?: MetricLabels
-  timestamp?: string
-  type?: string
-}
 
 interface NodeDetail {
   ready: boolean
