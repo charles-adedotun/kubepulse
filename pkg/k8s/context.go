@@ -88,9 +88,8 @@ func (cm *ContextManager) ListContexts() ([]ContextInfo, error) {
 			info.Server = cluster.Server
 		}
 
-		if authInfo != nil {
-			// Could add more user info if needed
-		}
+		// Note: authInfo could be used to add more user info if needed in the future
+		_ = authInfo
 
 		contexts = append(contexts, info)
 	}
