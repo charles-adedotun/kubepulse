@@ -78,13 +78,13 @@ func TestEngineHealthCheck(t *testing.T) {
 
 	engineConfig := core.EngineConfig{
 		KubeClient:  fakeClient,
-		ContextName: "test-context", 
+		ContextName: "test-context",
 		Interval:    time.Second,
 		EnableAI:    false,
 	}
 
 	engine := core.NewEngine(engineConfig)
-	
+
 	// Add health check
 	podCheck := health.NewPodHealthCheck()
 	engine.AddCheck(podCheck)
