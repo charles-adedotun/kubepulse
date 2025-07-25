@@ -1,0 +1,189 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
+      upload_url: ${{ steps.release.outputs.upload_url }}
+    
+    steps:
+    - name: Release Please
+      uses: googleapis/release-please-action@v4
+      id: release
+      with:
+        config-file: .release-please-config.json
+        manifest-file: .release-please-manifest.json
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Output release information
+      if: ${{ steps.release.outputs.release_created }}
+      run: |
+        echo "🎉 Release created!"
+        echo "Tag: ${{ steps.release.outputs.tag_name }}"
+        echo "Version: ${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}"
+        echo "Upload URL: ${{ steps.release.outputs.upload_url }}"
+        echo ""
+        echo "The release tag has been created. The release workflow will handle building and publishing artifacts."
+
+  build-and-release:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64.exe
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+    
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        VERSION=${{ needs.release-please.outputs.version }}
+        BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        
+        go build \
+          -ldflags "-X main.version=$VERSION -X main.buildTime=$BUILD_TIME" \
+          -o kubepulse-${{ matrix.suffix }} \
+          ./cmd/kubepulse
+    
+    - name: Upload Release Binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release-please.outputs.upload_url }}
+        asset_path: ./kubepulse-${{ matrix.suffix }}
+        asset_name: kubepulse-${{ matrix.suffix }}
+        asset_content_type: application/octet-stream
+
+  build-docker-image:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+    
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=tag
+          type=semver,pattern={{version}},value=${{ needs.release-please.outputs.tag_name }}
+          type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.tag_name }}
+          type=semver,pattern={{major}},value=${{ needs.release-please.outputs.tag_name }}
+          type=sha
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ needs.release-please.outputs.version }}
+          BUILD_TIME=${{ steps.meta.outputs.created }}
+
+  create-release-notes:
+    needs: [release-please, build-and-release, build-docker-image]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Update release notes
+      run: |
+        RELEASE_TAG=${{ needs.release-please.outputs.tag_name }}
+        
+        # Add installation instructions to release notes
+        NOTES="## 🚀 Installation\n\n"
+        NOTES="${NOTES}### Binary Installation\n\n"
+        NOTES="${NOTES}\`\`\`bash\n"
+        NOTES="${NOTES}# Linux (amd64)\n"
+        NOTES="${NOTES}curl -LO https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/kubepulse-linux-amd64\n"
+        NOTES="${NOTES}chmod +x kubepulse-linux-amd64\n"
+        NOTES="${NOTES}sudo mv kubepulse-linux-amd64 /usr/local/bin/kubepulse\n\n"
+        NOTES="${NOTES}# macOS (arm64)\n"
+        NOTES="${NOTES}curl -LO https://github.com/${{ github.repository }}/releases/download/${RELEASE_TAG}/kubepulse-darwin-arm64\n"
+        NOTES="${NOTES}chmod +x kubepulse-darwin-arm64\n"
+        NOTES="${NOTES}sudo mv kubepulse-darwin-arm64 /usr/local/bin/kubepulse\n"
+        NOTES="${NOTES}\`\`\`\n\n"
+        NOTES="${NOTES}### Docker Installation\n\n"
+        NOTES="${NOTES}\`\`\`bash\n"
+        NOTES="${NOTES}docker pull ghcr.io/${{ github.repository }}:${RELEASE_TAG}\n"
+        NOTES="${NOTES}\`\`\`\n\n"
+        NOTES="${NOTES}### Kubernetes Deployment\n\n"
+        NOTES="${NOTES}\`\`\`bash\n"
+        NOTES="${NOTES}kubectl apply -f https://raw.githubusercontent.com/${{ github.repository }}/${RELEASE_TAG}/deployments/kubepulse.yaml\n"
+        NOTES="${NOTES}\`\`\`\n"
+        
+        # Append to existing release notes
+        gh release edit ${RELEASE_TAG} \
+          --repo ${{ github.repository }} \
+          --notes-file - <<EOF
+        $(gh release view ${RELEASE_TAG} --repo ${{ github.repository }} --json body -q .body)
+        
+        $NOTES
+        EOF
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -131,14 +131,14 @@ func (p *PromptBuilder) BuildAnalysisPrompt(ctx *PromptContext) (string, error) 
 	var promptBuilder strings.Builder
 
 	// Add system context header
-	promptBuilder.WriteString(fmt.Sprintf("KUBERNETES CLUSTER ANALYSIS REQUEST\n"))
-	promptBuilder.WriteString(fmt.Sprintf("Analysis Type: %s\n", ctx.AnalysisType))
-	promptBuilder.WriteString(fmt.Sprintf("Cluster: %s\n", ctx.ClusterName))
-	promptBuilder.WriteString(fmt.Sprintf("Timestamp: %s\n\n", time.Now().Format(time.RFC3339)))
+	promptBuilder.WriteString("KUBERNETES CLUSTER ANALYSIS REQUEST\n")
+	fmt.Fprintf(&promptBuilder, "Analysis Type: %s\n", ctx.AnalysisType)
+	fmt.Fprintf(&promptBuilder, "Cluster: %s\n", ctx.ClusterName)
+	fmt.Fprintf(&promptBuilder, "Timestamp: %s\n\n", time.Now().Format(time.RFC3339))
 
 	// Add user context if provided
 	if ctx.UserContext != "" {
-		promptBuilder.WriteString(fmt.Sprintf("USER REQUEST: %s\n\n", ctx.UserContext))
+		fmt.Fprintf(&promptBuilder, "USER REQUEST: %s\n\n", ctx.UserContext)
 	}
 
 	// Add kubectl results
@@ -177,17 +177,17 @@ func (p *PromptBuilder) addKubectlResults(builder *strings.Builder, results map[
 	}
 
 	for toolName, result := range results {
-		builder.WriteString(fmt.Sprintf("## Tool: %s\n", toolName))
-		builder.WriteString(fmt.Sprintf("Execution Time: %v\n", result.ExecutionTime))
-		builder.WriteString(fmt.Sprintf("Success: %t\n", result.Success))
+		fmt.Fprintf(builder, "## Tool: %s\n", toolName)
+		fmt.Fprintf(builder, "Execution Time: %v\n", result.ExecutionTime)
+		fmt.Fprintf(builder, "Success: %t\n", result.Success)
 
 		if result.Summary != "" {
-			builder.WriteString(fmt.Sprintf("Summary: %s\n", result.Summary))
+			fmt.Fprintf(builder, "Summary: %s\n", result.Summary)
 		}
 
 		// Add command outputs
 		for cmd, output := range result.Outputs {
-			builder.WriteString(fmt.Sprintf("\n### Command: %s\n", cmd))
+			fmt.Fprintf(builder, "\n### Command: %s\n", cmd)
 			if len(output) > 5000 {
 				// Truncate very long outputs but preserve structure
 				lines := strings.Split(output, "\n")
@@ -197,22 +197,22 @@ func (p *PromptBuilder) addKubectlResults(builder *strings.Builder, results map[
 					output = strings.Join(truncated, "\n")
 				}
 			}
-			builder.WriteString(fmt.Sprintf("```\n%s\n```\n", output))
+			fmt.Fprintf(builder, "```\n%s\n```\n", output)
 		}
 
 		// Add errors if any
 		if len(result.Errors) > 0 {
 			builder.WriteString("\n### Errors:\n")
 			for cmd, errMsg := range result.Errors {
-				builder.WriteString(fmt.Sprintf("- %s: %s\n", cmd, errMsg))
+				fmt.Fprintf(builder, "- %s: %s\n", cmd, errMsg)
 			}
 		}
 
 		// Add metadata if available
-		if result.Metadata != nil && len(result.Metadata) > 0 {
+		if len(result.Metadata) > 0 {
 			if extractedMetrics, ok := result.Metadata["extracted_metrics"]; ok {
 				metricJSON, _ := json.MarshalIndent(extractedMetrics, "", "  ")
-				builder.WriteString(fmt.Sprintf("\n### Extracted Metrics:\n```json\n%s\n```\n", string(metricJSON)))
+				fmt.Fprintf(builder, "\n### Extracted Metrics:\n```json\n%s\n```\n", string(metricJSON))
 			}
 		}
 
@@ -226,17 +226,17 @@ func (p *PromptBuilder) addKubectlResults(builder *strings.Builder, results map[
 func (p *PromptBuilder) addClusterContext(builder *strings.Builder, ctx *ClusterContext) {
 	builder.WriteString("=== CLUSTER CONTEXT ===\n\n")
 	
-	builder.WriteString(fmt.Sprintf("Last Analysis: %s\n", ctx.LastAnalysis.Format(time.RFC3339)))
-	builder.WriteString(fmt.Sprintf("Health Score: %.2f\n", ctx.HealthScore))
-	builder.WriteString(fmt.Sprintf("AI Confidence: %.2f\n", ctx.AIConfidence))
-	builder.WriteString(fmt.Sprintf("Node Count: %d\n", ctx.NodeCount))
-	builder.WriteString(fmt.Sprintf("Namespace Count: %d\n", ctx.NamespaceCount))
+	fmt.Fprintf(builder, "Last Analysis: %s\n", ctx.LastAnalysis.Format(time.RFC3339))
+	fmt.Fprintf(builder, "Health Score: %.2f\n", ctx.HealthScore)
+	fmt.Fprintf(builder, "AI Confidence: %.2f\n", ctx.AIConfidence)
+	fmt.Fprintf(builder, "Node Count: %d\n", ctx.NodeCount)
+	fmt.Fprintf(builder, "Namespace Count: %d\n", ctx.NamespaceCount)
 
 	// Add baseline metrics
 	if len(ctx.BaselineMetrics) > 0 {
 		builder.WriteString("\n## Baseline Performance Metrics:\n")
 		for metric, value := range ctx.BaselineMetrics {
-			builder.WriteString(fmt.Sprintf("- %s: %.2f\n", metric, value))
+			fmt.Fprintf(builder, "- %s: %.2f\n", metric, value)
 		}
 	}
 
@@ -245,9 +245,9 @@ func (p *PromptBuilder) addClusterContext(builder *strings.Builder, ctx *Cluster
 		builder.WriteString("\n## Known Issues:\n")
 		for _, issue := range ctx.KnownIssues {
 			if issue.Status == "active" {
-				builder.WriteString(fmt.Sprintf("- [%s] %s: %s (Resource: %s, Since: %s)\n",
+				fmt.Fprintf(builder, "- [%s] %s: %s (Resource: %s, Since: %s)\n",
 					issue.Severity, issue.Type, issue.Description, issue.Resource, 
-					issue.FirstSeen.Format("2006-01-02")))
+					issue.FirstSeen.Format("2006-01-02"))
 			}
 		}
 	}
@@ -259,24 +259,24 @@ func (p *PromptBuilder) addClusterContext(builder *strings.Builder, ctx *Cluster
 func (p *PromptBuilder) addHistoricalContext(builder *strings.Builder, history []AnalysisSession) {
 	builder.WriteString("=== ANALYSIS HISTORY ===\n\n")
 	
-	builder.WriteString(fmt.Sprintf("Recent analysis sessions (%d):\n", len(history)))
+	fmt.Fprintf(builder, "Recent analysis sessions (%d):\n", len(history))
 	
 	for i, session := range history {
 		if i >= 3 { // Limit to most recent 3 for brevity
 			break
 		}
 		
-		builder.WriteString(fmt.Sprintf("\n## Session %d (%s):\n", i+1, session.Timestamp.Format("2006-01-02 15:04")))
-		builder.WriteString(fmt.Sprintf("Type: %s\n", session.AnalysisType))
-		builder.WriteString(fmt.Sprintf("Confidence: %.2f\n", session.Confidence))
-		builder.WriteString(fmt.Sprintf("Duration: %v\n", session.Duration))
+		fmt.Fprintf(builder, "\n## Session %d (%s):\n", i+1, session.Timestamp.Format("2006-01-02 15:04"))
+		fmt.Fprintf(builder, "Type: %s\n", session.AnalysisType)
+		fmt.Fprintf(builder, "Confidence: %.2f\n", session.Confidence)
+		fmt.Fprintf(builder, "Duration: %v\n", session.Duration)
 		
 		if session.AIResponse != "" && len(session.AIResponse) < 500 {
-			builder.WriteString(fmt.Sprintf("Summary: %s\n", session.AIResponse))
+			fmt.Fprintf(builder, "Summary: %s\n", session.AIResponse)
 		}
 		
 		if !session.Success && session.ErrorMessage != "" {
-			builder.WriteString(fmt.Sprintf("Error: %s\n", session.ErrorMessage))
+			fmt.Fprintf(builder, "Error: %s\n", session.ErrorMessage)
 		}
 	}
 	
@@ -293,15 +293,15 @@ func (p *PromptBuilder) addPatternContext(builder *strings.Builder, patterns []C
 	}
 	
 	for _, pattern := range recentPatterns {
-		builder.WriteString(fmt.Sprintf("## Pattern: %s\n", pattern.PatternName))
-		builder.WriteString(fmt.Sprintf("Type: %s\n", pattern.PatternType))
-		builder.WriteString(fmt.Sprintf("Description: %s\n", pattern.Description))
-		builder.WriteString(fmt.Sprintf("Frequency: %d occurrences\n", pattern.Frequency))
-		builder.WriteString(fmt.Sprintf("Confidence: %.2f\n", pattern.Confidence))
-		builder.WriteString(fmt.Sprintf("Last Seen: %s\n", pattern.LastSeen.Format("2006-01-02 15:04")))
+		fmt.Fprintf(builder, "## Pattern: %s\n", pattern.PatternName)
+		fmt.Fprintf(builder, "Type: %s\n", pattern.PatternType)
+		fmt.Fprintf(builder, "Description: %s\n", pattern.Description)
+		fmt.Fprintf(builder, "Frequency: %d occurrences\n", pattern.Frequency)
+		fmt.Fprintf(builder, "Confidence: %.2f\n", pattern.Confidence)
+		fmt.Fprintf(builder, "Last Seen: %s\n", pattern.LastSeen.Format("2006-01-02 15:04"))
 		
 		if pattern.Indicators != "" {
-			builder.WriteString(fmt.Sprintf("Indicators: %s\n", pattern.Indicators))
+			fmt.Fprintf(builder, "Indicators: %s\n", pattern.Indicators)
 		}
 		
 		builder.WriteString("\n")

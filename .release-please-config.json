@@ -1,0 +1,17 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "go",
+      "package-name": "kubepulse",
+      "extra-files": [
+        "README.md",
+        {
+          "type": "generic",
+          "path": "cmd/kubepulse/main.go",
+          "glob": "**/*.go"
+        }
+      ]
+    }
+  },
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
+}

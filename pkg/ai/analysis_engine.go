@@ -68,7 +68,7 @@ func (ae *AnalysisEngine) AnalyzeCluster(ctx context.Context, clusterName string
 		ID:          fmt.Sprintf("analysis-%d", time.Now().Unix()),
 		Type:        analysisType,
 		ClusterName: clusterName,
-		Context:     fmt.Sprintf("Comprehensive cluster analysis using kubectl runbook"),
+		Context:     "Comprehensive cluster analysis using kubectl runbook",
 		KubectlData: kubectlData,
 		Timestamp:   time.Now(),
 		Timeout:     120 * time.Second,

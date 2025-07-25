@@ -88,7 +88,7 @@ func (c *ContextAwareClient) AnalyzeWithContext(ctx context.Context, request Ana
 	}
 
 	// Perform analysis
-	response, err := c.Client.Analyze(ctx, legacyRequest)
+	response, err := c.Analyze(ctx, legacyRequest)
 	if err != nil {
 		// Record failed analysis
 		session := &AnalysisSession{
@@ -103,7 +103,7 @@ func (c *ContextAwareClient) AnalyzeWithContext(ctx context.Context, request Ana
 			Success:        false,
 			ErrorMessage:   err.Error(),
 		}
-		c.database.StoreAnalysisSession(session)
+		_ = c.database.StoreAnalysisSession(session)
 		return nil, err
 	}
 

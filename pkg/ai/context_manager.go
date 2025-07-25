@@ -250,7 +250,9 @@ func (c *ContextManager) CleanupOldData(ctx context.Context, maxAge time.Duratio
 	if err != nil {
 		return fmt.Errorf("failed to query cluster contexts: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	// Process each cluster context
 	for rows.Next() {
@@ -313,7 +315,9 @@ func (c *ContextManager) ListClusters() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var clusters []string
 	for rows.Next() {

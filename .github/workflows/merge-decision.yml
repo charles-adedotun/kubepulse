@@ -1,0 +1,324 @@
+name: Merge Decision
+
+on:
+  # Run as a required status check on every PR  
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write  # Required for merging PRs
+  pull-requests: write
+  issues: read
+  actions: read
+  checks: read
+  statuses: write  # Required for creating commit status checks
+  id-token: write
+
+jobs:
+  wait-for-checks:
+    runs-on: ubuntu-latest
+    outputs:
+      all_checks_complete: ${{ steps.check-status.outputs.all_complete }}
+      pr_number: ${{ steps.get-pr.outputs.pr_number }}
+    steps:
+      - name: Get PR number
+        id: get-pr
+        run: |
+          echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+      
+      - name: Wait for other checks to complete
+        id: check-status
+        run: |
+          PR_NUMBER=${{ steps.get-pr.outputs.pr_number }}
+          echo "Checking status of PR #$PR_NUMBER"
+          
+          # Wait up to 30 minutes for checks to complete
+          MAX_ATTEMPTS=60
+          SLEEP_TIME=30
+          
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $i of $MAX_ATTEMPTS"
+            
+            # Get all check runs for this PR
+            CHECKS=$(gh pr checks $PR_NUMBER --repo ${{ github.repository }} --json name,state)
+            
+            # Get all available checks
+            AVAILABLE_CHECKS=$(echo "$CHECKS" | jq -r '.[].name' | sort)
+            echo "Available checks: $(echo "$AVAILABLE_CHECKS" | tr '\n' ', ' | sed 's/,$//')"
+            
+            # Define required checks for KubePulse
+            REQUIRED_CHECKS=()
+            
+            # Look for Go CI checks
+            if echo "$AVAILABLE_CHECKS" | grep -q "Test"; then
+              REQUIRED_CHECKS+=("Test")
+            fi
+            if echo "$AVAILABLE_CHECKS" | grep -q "Build"; then
+              REQUIRED_CHECKS+=("Build")
+            fi
+            if echo "$AVAILABLE_CHECKS" | grep -q "Lint"; then
+              REQUIRED_CHECKS+=("Lint")
+            fi
+            
+            # Look for Frontend CI checks
+            if echo "$AVAILABLE_CHECKS" | grep -q "Test and Build"; then
+              REQUIRED_CHECKS+=("Test and Build")
+            fi
+            if echo "$AVAILABLE_CHECKS" | grep -q "Security Audit"; then
+              REQUIRED_CHECKS+=("Security Audit")
+            fi
+            
+            # Look for Claude review
+            if echo "$AVAILABLE_CHECKS" | grep -q "claude-review"; then
+              REQUIRED_CHECKS+=("claude-review")
+            fi
+            
+            # If no standard checks found, wait for any available checks
+            if [ ${#REQUIRED_CHECKS[@]} -eq 0 ]; then
+              echo "No standard checks found, waiting for any available checks..."
+              while IFS= read -r check; do
+                REQUIRED_CHECKS+=("$check")
+              done <<< "$AVAILABLE_CHECKS"
+            fi
+            
+            echo "Required checks: ${REQUIRED_CHECKS[*]}"
+            
+            ALL_COMPLETE=true
+            ALL_SUCCESS=true
+            
+            for check in "${REQUIRED_CHECKS[@]}"; do
+              CHECK_STATE=$(echo "$CHECKS" | jq -r ".[] | select(.name == \"$check\") | .state // \"not_found\"")
+              
+              echo "  $check: state=$CHECK_STATE"
+              
+              if [ "$CHECK_STATE" = "not_found" ] || [ "$CHECK_STATE" = "PENDING" ] || [ "$CHECK_STATE" = "QUEUED" ] || [ "$CHECK_STATE" = "IN_PROGRESS" ]; then
+                ALL_COMPLETE=false
+              fi
+              
+              if [ "$CHECK_STATE" = "FAILURE" ] || [ "$CHECK_STATE" = "CANCELLED" ]; then
+                ALL_SUCCESS=false
+              fi
+            done
+            
+            if [ "$ALL_COMPLETE" = "true" ]; then
+              echo "All required checks have completed"
+              echo "all_complete=true" >> $GITHUB_OUTPUT
+              echo "all_success=$ALL_SUCCESS" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            # Don't sleep on the last attempt
+            if [ $i -lt $MAX_ATTEMPTS ]; then
+              echo "Waiting $SLEEP_TIME seconds before next check..."
+              sleep $SLEEP_TIME
+            fi
+          done
+          
+          echo "Timeout waiting for checks to complete"
+          echo "all_complete=false" >> $GITHUB_OUTPUT
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  merge-decision:
+    runs-on: ubuntu-latest
+    needs: wait-for-checks
+    if: needs.wait-for-checks.outputs.all_checks_complete == 'true'
+    outputs:
+      DECISION: ${{ steps.parse-decision.outputs.DECISION }}
+      REASON: ${{ steps.parse-decision.outputs.REASON }}
+      RECOMMENDED_ACTION: ${{ steps.parse-decision.outputs.RECOMMENDED_ACTION }}
+    
+    steps:
+      - name: Gather PR context
+        id: pr-context
+        run: |
+          PR_NUMBER=${{ needs.wait-for-checks.outputs.pr_number }}
+          echo "Gathering comprehensive PR context for PR #$PR_NUMBER..."
+          
+          # Get all check results
+          echo "CHECK_RESULTS<<EOF" >> $GITHUB_OUTPUT
+          gh pr checks $PR_NUMBER \
+            --repo ${{ github.repository }} \
+            --json name,state,conclusion \
+            | jq -r '.[] | "\(.name): \(.state) (\(.conclusion // "pending"))"' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Get PR metadata
+          PR_DATA=$(gh pr view $PR_NUMBER \
+            --repo ${{ github.repository }} \
+            --json title,body,mergeable,mergeStateStatus,isDraft,author,baseRefName,headRefName,commits)
+          
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "PR_TITLE=$(echo "$PR_DATA" | jq -r '.title')" >> $GITHUB_OUTPUT
+          echo "PR_MERGEABLE=$(echo "$PR_DATA" | jq -r '.mergeable')" >> $GITHUB_OUTPUT
+          echo "PR_MERGE_STATE=$(echo "$PR_DATA" | jq -r '.mergeStateStatus')" >> $GITHUB_OUTPUT
+          echo "PR_IS_DRAFT=$(echo "$PR_DATA" | jq -r '.isDraft')" >> $GITHUB_OUTPUT
+          echo "PR_AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')" >> $GITHUB_OUTPUT
+          echo "BASE_BRANCH=$(echo "$PR_DATA" | jq -r '.baseRefName')" >> $GITHUB_OUTPUT
+          echo "HEAD_BRANCH=$(echo "$PR_DATA" | jq -r '.headRefName')" >> $GITHUB_OUTPUT
+          
+          # Get latest Claude review if available
+          echo "Attempting to fetch Claude review..."
+          CLAUDE_COMMENT=$(gh pr view $PR_NUMBER \
+            --repo ${{ github.repository }} \
+            --json comments \
+            --jq '.comments[] | select(.author.login == "claude") | .body' \
+            | tail -1)
+          
+          if [ -n "$CLAUDE_COMMENT" ]; then
+            echo "CLAUDE_REVIEW<<EOF" >> $GITHUB_OUTPUT
+            echo "$CLAUDE_COMMENT" | head -500 >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "Found Claude review (${#CLAUDE_COMMENT} characters)"
+          else
+            echo "CLAUDE_REVIEW=No Claude review found" >> $GITHUB_OUTPUT
+            echo "No Claude review found"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Parse check results and make decision
+        id: parse-decision
+        run: |
+          echo "Analyzing check results and PR metadata..."
+          
+          # Initialize decision variables
+          DECISION="HOLD"
+          REASON=""
+          RECOMMENDED_ACTION=""
+          
+          # Check if PR is a draft
+          if [ "${{ steps.pr-context.outputs.PR_IS_DRAFT }}" = "true" ]; then
+            DECISION="HOLD"
+            REASON="PR is marked as draft"
+            RECOMMENDED_ACTION="Mark PR as ready for review when development is complete"
+          else
+            # Parse check results
+            CHECKS_PASSED=true
+            FAILED_CHECKS=""
+            
+            while IFS= read -r check_result; do
+              if [[ "$check_result" == *"FAILURE"* ]] || [[ "$check_result" == *"(failure)"* ]]; then
+                CHECKS_PASSED=false
+                CHECK_NAME=$(echo "$check_result" | cut -d':' -f1)
+                FAILED_CHECKS="${FAILED_CHECKS}, ${CHECK_NAME}"
+              fi
+            done <<< "${{ steps.pr-context.outputs.CHECK_RESULTS }}"
+            
+            # Check mergeable state
+            MERGEABLE="${{ steps.pr-context.outputs.PR_MERGEABLE }}"
+            MERGE_STATE="${{ steps.pr-context.outputs.PR_MERGE_STATE }}"
+            
+            # Parse Claude review if available
+            CLAUDE_RECOMMENDATION="UNKNOWN"
+            if [[ "${{ steps.pr-context.outputs.CLAUDE_REVIEW }}" != "No Claude review found" ]]; then
+              # Look for recommendation in Claude's review
+              if echo "${{ steps.pr-context.outputs.CLAUDE_REVIEW }}" | grep -qi "APPROVE"; then
+                CLAUDE_RECOMMENDATION="APPROVE"
+              elif echo "${{ steps.pr-context.outputs.CLAUDE_REVIEW }}" | grep -qi "REQUEST_CHANGES"; then
+                CLAUDE_RECOMMENDATION="REQUEST_CHANGES"
+              elif echo "${{ steps.pr-context.outputs.CLAUDE_REVIEW }}" | grep -qi "COMMENT"; then
+                CLAUDE_RECOMMENDATION="COMMENT"
+              fi
+            fi
+            
+            # Make final decision
+            if [ "$CHECKS_PASSED" = "false" ]; then
+              DECISION="BLOCK"
+              REASON="Required checks failed: ${FAILED_CHECKS:2}"
+              RECOMMENDED_ACTION="Fix failing checks and update the PR"
+            elif [ "$MERGEABLE" != "true" ] || [ "$MERGE_STATE" != "CLEAN" ]; then
+              DECISION="BLOCK"
+              REASON="PR has merge conflicts or is not in a mergeable state"
+              RECOMMENDED_ACTION="Resolve merge conflicts and ensure PR is up to date with base branch"
+            elif [ "$CLAUDE_RECOMMENDATION" = "REQUEST_CHANGES" ]; then
+              DECISION="BLOCK"
+              REASON="Claude review requested changes"
+              RECOMMENDED_ACTION="Address Claude's feedback and update the PR"
+            elif [ "$CLAUDE_RECOMMENDATION" = "APPROVE" ] && [ "$CHECKS_PASSED" = "true" ]; then
+              DECISION="APPROVE"
+              REASON="All checks passed and Claude approved the changes"
+              RECOMMENDED_ACTION="PR is ready to merge"
+            elif [ "$CLAUDE_RECOMMENDATION" = "COMMENT" ]; then
+              DECISION="REVIEW"
+              REASON="Claude provided comments for consideration"
+              RECOMMENDED_ACTION="Review Claude's comments and decide if changes are needed"
+            else
+              DECISION="REVIEW"
+              REASON="Manual review required - Claude review status unclear"
+              RECOMMENDED_ACTION="A maintainer should manually review this PR"
+            fi
+          fi
+          
+          echo "DECISION=$DECISION" >> $GITHUB_OUTPUT
+          echo "REASON=$REASON" >> $GITHUB_OUTPUT
+          echo "RECOMMENDED_ACTION=$RECOMMENDED_ACTION" >> $GITHUB_OUTPUT
+          
+          # Log decision
+          echo "================================================"
+          echo "MERGE DECISION: $DECISION"
+          echo "REASON: $REASON"
+          echo "RECOMMENDED ACTION: $RECOMMENDED_ACTION"
+          echo "================================================"
+
+      - name: Post merge decision comment
+        if: always()
+        run: |
+          PR_NUMBER=${{ needs.wait-for-checks.outputs.pr_number }}
+          DECISION="${{ steps.parse-decision.outputs.DECISION }}"
+          REASON="${{ steps.parse-decision.outputs.REASON }}"
+          ACTION="${{ steps.parse-decision.outputs.RECOMMENDED_ACTION }}"
+          
+          # Determine emoji based on decision
+          case "$DECISION" in
+            "APPROVE") EMOJI="✅" ;;
+            "REVIEW") EMOJI="👀" ;;
+            "BLOCK") EMOJI="🚫" ;;
+            "HOLD") EMOJI="⏸️" ;;
+            *) EMOJI="❓" ;;
+          esac
+          
+          # Create comment body
+          COMMENT_BODY="## $EMOJI Merge Decision: $DECISION
+
+**Reason:** $REASON
+
+**Recommended Action:** $ACTION
+
+---
+*This is an automated merge decision based on CI checks and code review results.*"
+          
+          # Post comment
+          gh pr comment $PR_NUMBER \
+            --repo ${{ github.repository }} \
+            --body "$COMMENT_BODY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set commit status
+        if: always()
+        run: |
+          DECISION="${{ steps.parse-decision.outputs.DECISION }}"
+          REASON="${{ steps.parse-decision.outputs.REASON }}"
+          
+          # Map decision to status state
+          case "$DECISION" in
+            "APPROVE") STATE="success" ;;
+            "REVIEW") STATE="pending" ;;
+            "BLOCK"|"HOLD") STATE="failure" ;;
+            *) STATE="error" ;;
+          esac
+          
+          # Create status check
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }} \
+            -f state="$STATE" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="$REASON" \
+            -f context="merge-decision"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

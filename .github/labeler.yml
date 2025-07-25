@@ -1,0 +1,119 @@
+# Label configuration for PR auto-labeling
+
+# Backend changes
+backend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+
+# Frontend changes
+frontend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'frontend/**/*'
+      - 'package.json'
+      - 'package-lock.json'
+
+# AI-related changes
+ai:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pkg/ai/**/*'
+      - 'internal/ai/**/*'
+
+# Kubernetes/deployment changes
+kubernetes:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'deployments/**/*'
+      - '**/*.yaml'
+      - '**/*.yml'
+      - '**/Dockerfile*'
+
+# Documentation changes
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.md'
+      - '**/*.MD'
+      - 'docs/**/*'
+
+# Test changes
+tests:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*_test.go'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+      - '**/*.spec.ts'
+      - '**/*.spec.tsx'
+      - '**/testdata/**/*'
+
+# Configuration changes
+configuration:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**/*'
+      - '.*rc'
+      - '.*config*'
+      - 'config/**/*'
+
+# API changes
+api:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pkg/api/**/*'
+      - 'internal/api/**/*'
+      - '**/handlers.go'
+      - '**/routes.go'
+
+# Core engine changes
+core:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pkg/core/**/*'
+      - 'internal/core/**/*'
+      - 'pkg/engine/**/*'
+
+# CLI changes
+cli:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'cmd/**/*'
+      - 'internal/cli/**/*'
+
+# Health check changes
+health:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pkg/health/**/*'
+      - 'pkg/checks/**/*'
+      - 'internal/health/**/*'
+
+# WebSocket changes
+websocket:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/websocket*.go'
+      - '**/ws*.go'
+      - 'frontend/src/hooks/useWebSocket.ts'
+
+# Database changes
+database:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/database*.go'
+      - '**/db*.go'
+      - '**/*.sql'
+      - 'migrations/**/*'
+
+# Security changes
+security:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/auth*.go'
+      - '**/security*.go'
+      - '**/rbac*.go'
+      - '.github/workflows/*security*'

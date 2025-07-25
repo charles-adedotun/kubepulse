@@ -1,0 +1,271 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for commit validation
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Check PR title format
+      run: |
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        echo "Checking PR title: $PR_TITLE"
+        
+        # Check for conventional commit format
+        if [[ ! "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+ ]]; then
+          echo "❌ PR title does not follow conventional commit format"
+          echo "Expected format: type(scope): description"
+          echo "Example: feat(ai): add predictive analytics"
+          exit 1
+        fi
+        echo "✅ PR title follows conventional commit format"
+    
+    - name: Check commit messages
+      run: |
+        # Get all commits in this PR
+        COMMITS=$(git log --format="%s" origin/main..HEAD)
+        INVALID_COMMITS=""
+        
+        while IFS= read -r commit; do
+          if [[ ! "$commit" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+ ]]; then
+            INVALID_COMMITS="$INVALID_COMMITS\n- $commit"
+          fi
+        done <<< "$COMMITS"
+        
+        if [ -n "$INVALID_COMMITS" ]; then
+          echo "❌ Some commits don't follow conventional format:"
+          echo -e "$INVALID_COMMITS"
+          echo ""
+          echo "Please use conventional commit format: type(scope): description"
+          exit 1
+        fi
+        echo "✅ All commits follow conventional format"
+    
+    - name: Check Go module integrity
+      run: |
+        go mod tidy
+        if [ -n "$(git status --porcelain go.mod go.sum)" ]; then
+          echo "❌ go.mod or go.sum needs updating"
+          echo "Run 'go mod tidy' and commit the changes"
+          exit 1
+        fi
+        echo "✅ Go modules are up to date"
+    
+    - name: Check frontend dependencies
+      working-directory: frontend
+      run: |
+        npm ci
+        # Check for security vulnerabilities
+        npm audit --audit-level=high || echo "⚠️ Found vulnerabilities, please review"
+    
+    - name: Validate Kubernetes manifests
+      run: |
+        echo "Checking Kubernetes YAML files..."
+        
+        # Find all YAML files in deployments directory
+        if [ -d "deployments" ]; then
+          for file in $(find deployments -name "*.yaml" -o -name "*.yml"); do
+            echo "Validating $file"
+            # Basic YAML validation
+            if ! python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null; then
+              echo "❌ Invalid YAML in $file"
+              exit 1
+            fi
+          done
+          echo "✅ All Kubernetes manifests are valid YAML"
+        else
+          echo "ℹ️ No deployments directory found"
+        fi
+    
+    - name: Check for large files
+      run: |
+        # Find files larger than 1MB
+        LARGE_FILES=$(find . -type f -size +1M -not -path "./.git/*" -not -path "./vendor/*" -not -path "./node_modules/*" -not -path "./frontend/node_modules/*" -not -path "./frontend/dist/*" -not -path "*/coverage/*")
+        
+        if [ -n "$LARGE_FILES" ]; then
+          echo "⚠️ Found large files (>1MB):"
+          echo "$LARGE_FILES"
+          echo ""
+          echo "Consider using Git LFS for large binary files"
+        else
+          echo "✅ No large files detected"
+        fi
+    
+    - name: Check documentation updates
+      run: |
+        # Check if code changes require documentation updates
+        CODE_CHANGES=$(git diff --name-only origin/main..HEAD | grep -E "\.(go|ts|tsx|js|jsx)$" | wc -l)
+        DOC_CHANGES=$(git diff --name-only origin/main..HEAD | grep -E "\.(md|MD)$" | wc -l)
+        
+        if [ $CODE_CHANGES -gt 5 ] && [ $DOC_CHANGES -eq 0 ]; then
+          echo "⚠️ Significant code changes detected without documentation updates"
+          echo "Consider updating relevant documentation or README files"
+        else
+          echo "✅ Documentation check passed"
+        fi
+    
+    - name: Validate binary can be built
+      run: |
+        echo "Building KubePulse binary..."
+        go build -o kubepulse-test ./cmd/kubepulse
+        
+        # Test basic functionality
+        ./kubepulse-test --version
+        ./kubepulse-test --help
+        
+        echo "✅ Binary builds and runs successfully"
+        rm kubepulse-test
+    
+    - name: Check CLI help output
+      run: |
+        go run ./cmd/kubepulse --help > help_output.txt
+        
+        # Check that essential commands are documented
+        REQUIRED_COMMANDS=("serve" "diagnose" "version" "help")
+        MISSING_COMMANDS=""
+        
+        for cmd in "${REQUIRED_COMMANDS[@]}"; do
+          if ! grep -q "$cmd" help_output.txt; then
+            MISSING_COMMANDS="$MISSING_COMMANDS $cmd"
+          fi
+        done
+        
+        if [ -n "$MISSING_COMMANDS" ]; then
+          echo "❌ Missing commands in help output:$MISSING_COMMANDS"
+          cat help_output.txt
+          exit 1
+        fi
+        
+        echo "✅ All required commands are documented"
+        rm help_output.txt
+    
+    - name: Frontend build check
+      working-directory: frontend
+      run: |
+        echo "Building frontend..."
+        npm run build
+        
+        # Check build output exists
+        if [ ! -d "dist" ]; then
+          echo "❌ Frontend build failed - no dist directory"
+          exit 1
+        fi
+        
+        # Check for index.html
+        if [ ! -f "dist/index.html" ]; then
+          echo "❌ Frontend build incomplete - missing index.html"
+          exit 1
+        fi
+        
+        echo "✅ Frontend builds successfully"
+
+  label-pr:
+    name: Auto-label PR
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    
+    steps:
+    - name: Label based on files changed
+      uses: actions/labeler@v5
+      with:
+        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+        configuration-path: .github/labeler.yml
+      continue-on-error: true  # Don't fail if labeler config doesn't exist
+    
+    - name: Add size labels
+      run: |
+        PR_NUMBER=${{ github.event.pull_request.number }}
+        
+        # Get PR diff stats
+        STATS=$(gh pr view $PR_NUMBER --repo ${{ github.repository }} --json additions,deletions)
+        ADDITIONS=$(echo $STATS | jq -r '.additions')
+        DELETIONS=$(echo $STATS | jq -r '.deletions')
+        TOTAL=$((ADDITIONS + DELETIONS))
+        
+        # Remove existing size labels
+        gh pr edit $PR_NUMBER --repo ${{ github.repository }} --remove-label "size/XS,size/S,size/M,size/L,size/XL" || true
+        
+        # Add appropriate size label
+        if [ $TOTAL -lt 10 ]; then
+          gh pr edit $PR_NUMBER --repo ${{ github.repository }} --add-label "size/XS"
+        elif [ $TOTAL -lt 50 ]; then
+          gh pr edit $PR_NUMBER --repo ${{ github.repository }} --add-label "size/S"
+        elif [ $TOTAL -lt 200 ]; then
+          gh pr edit $PR_NUMBER --repo ${{ github.repository }} --add-label "size/M"
+        elif [ $TOTAL -lt 500 ]; then
+          gh pr edit $PR_NUMBER --repo ${{ github.repository }} --add-label "size/L"
+        else
+          gh pr edit $PR_NUMBER --repo ${{ github.repository }} --add-label "size/XL"
+        fi
+        
+        echo "PR has $ADDITIONS additions and $DELETIONS deletions (total: $TOTAL lines)"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true  # Don't fail if labels don't exist
+
+  summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: always()
+    
+    steps:
+    - name: Generate PR summary comment
+      run: |
+        PR_NUMBER=${{ github.event.pull_request.number }}
+        
+        # Create summary
+        COMMENT="## 📋 PR Validation Summary\n\n"
+        
+        # Check job status
+        if [ "${{ needs.validate.result }}" == "success" ]; then
+          COMMENT="${COMMENT}✅ **All PR checks passed!**\n\n"
+        else
+          COMMENT="${COMMENT}❌ **Some PR checks failed**\n\n"
+        fi
+        
+        COMMENT="${COMMENT}### Checks performed:\n"
+        COMMENT="${COMMENT}- PR title format validation\n"
+        COMMENT="${COMMENT}- Commit message format validation\n"
+        COMMENT="${COMMENT}- Go module integrity check\n"
+        COMMENT="${COMMENT}- Frontend dependency security audit\n"
+        COMMENT="${COMMENT}- Kubernetes manifest validation\n"
+        COMMENT="${COMMENT}- Large file detection\n"
+        COMMENT="${COMMENT}- Documentation update check\n"
+        COMMENT="${COMMENT}- Binary build validation\n"
+        COMMENT="${COMMENT}- CLI help documentation check\n"
+        COMMENT="${COMMENT}- Frontend build validation\n\n"
+        
+        COMMENT="${COMMENT}---\n"
+        COMMENT="${COMMENT}*This is an automated PR validation summary*"
+        
+        # Post comment
+        gh pr comment $PR_NUMBER \
+          --repo ${{ github.repository }} \
+          --body "$COMMENT"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true  # Don't fail the workflow if commenting fails

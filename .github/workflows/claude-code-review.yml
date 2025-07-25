@@ -1,0 +1,164 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    # Run on all PR types - no path restrictions to ensure all changes are reviewed
+
+jobs:
+  claude-review:
+    # Skip bot-created PRs since they don't have access to OAuth secrets
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@e26577a930883943cf9d90885cd1e8da510078dd # beta
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Optional: Specify model (defaults to Claude Sonnet 4)
+          # model: "claude-opus-4-20250514"
+          
+          # Direct prompt for KubePulse code review
+          direct_prompt: |
+            Please review this Kubernetes monitoring tool pull request with focus on:
+            
+            **For Go Code:**
+            - Proper error handling and error wrapping
+            - Goroutine safety and race conditions
+            - Context propagation and cancellation
+            - Kubernetes client-go best practices
+            - Resource cleanup (defer statements)
+            - Interface design and dependency injection
+            - Test coverage and test quality
+            
+            **For Frontend (React/TypeScript):**
+            - React hooks best practices
+            - TypeScript type safety
+            - WebSocket connection handling
+            - Component testing with Vitest
+            - Tailwind CSS usage
+            - State management patterns
+            
+            **For Kubernetes Integration:**
+            - RBAC requirements and security
+            - Resource limits and requests
+            - Health check patterns
+            - Kubectl command safety (whitelisting)
+            - Multi-context support
+            
+            **For AI Integration:**
+            - Claude API usage patterns
+            - Prompt engineering quality
+            - Error handling for AI failures
+            - Database schema and queries
+            - Security of AI-generated content
+            
+            **Please structure your review as follows:**
+            
+            ## Code Review Summary
+            
+            **Overall Assessment:** [Your overall assessment - Approve, Request Changes, or Comment]
+            
+            **Key Findings:**
+            - [List your main findings here]
+            
+            **Security Concerns:** [Any security issues, especially around kubectl execution or AI integration]
+            
+            **Code Quality:** [Assessment of Go idioms, React patterns, TypeScript usage]
+            
+            **Testing:** [Assessment of test coverage and quality]
+            
+            **Performance:** [Any performance considerations, especially for monitoring loops]
+            
+            **Kubernetes Best Practices:** [Compliance with K8s patterns and conventions]
+            
+            **Recommendations:**
+            - [Your specific, actionable recommendations]
+            
+            ## Detailed Analysis
+            
+            [Provide your detailed analysis here - be thorough and specific about Go patterns, Kubernetes usage, and React components]
+            
+            ## Final Recommendation
+            
+            [Your final recommendation: APPROVE, REQUEST_CHANGES, or COMMENT with clear reasoning]
+            
+            ---
+            
+            Be constructive and helpful. Provide specific code examples for improvements when relevant.
+
+          # Use sticky comments to update review on subsequent pushes
+          use_sticky_comment: true
+
+      - name: Capture Claude review content
+        if: always()  # Always run to capture review content
+        run: |
+          echo "📝 Capturing Claude review content for artifact..."
+          
+          # Create directory for this workflow run
+          RUN_DIR="/tmp/claude-review-${{ github.run_id }}-${{ github.run_attempt }}"
+          mkdir -p "$RUN_DIR"
+          
+          # Get the Claude review comment from the PR
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          
+          # Wait for comment to be posted
+          sleep 10
+          
+          # Get Claude's most recent substantial comment on this PR
+          CLAUDE_REVIEW_CONTENT=$(gh pr view $PR_NUMBER \
+            --repo ${{ github.repository }} \
+            --json comments \
+            --jq '.comments[] | select(.author.login == "claude" and (.body | length > 100)) | .body' \
+            | tail -1)
+          
+          if [ -n "$CLAUDE_REVIEW_CONTENT" ] && [ "$CLAUDE_REVIEW_CONTENT" != "null" ]; then
+            echo "✅ Successfully captured Claude review content (${#CLAUDE_REVIEW_CONTENT} characters)"
+            
+            # Save the complete review to artifact file
+            echo "$CLAUDE_REVIEW_CONTENT" > "$RUN_DIR/claude-review-analysis.md"
+            
+            # Verify file was created successfully
+            if [ -f "$RUN_DIR/claude-review-analysis.md" ]; then
+              FILE_SIZE=$(wc -c < "$RUN_DIR/claude-review-analysis.md")
+              echo "📄 Review analysis file created: $FILE_SIZE bytes"
+              echo "📝 File preview:"
+              head -5 "$RUN_DIR/claude-review-analysis.md"
+            else
+              echo "❌ Failed to create review analysis file"
+            fi
+          else
+            echo "⚠️ No substantial Claude review comment found, creating placeholder"
+            echo "# Claude Code Review - No Content Captured" > "$RUN_DIR/claude-review-analysis.md"
+            echo "" >> "$RUN_DIR/claude-review-analysis.md"
+            echo "⚠️ Claude review content was not successfully captured from the PR comments." >> "$RUN_DIR/claude-review-analysis.md"
+            echo "This could be due to:" >> "$RUN_DIR/claude-review-analysis.md"
+            echo "- Review still in progress" >> "$RUN_DIR/claude-review-analysis.md"
+            echo "- Comment not yet posted" >> "$RUN_DIR/claude-review-analysis.md"
+            echo "- API timing issues" >> "$RUN_DIR/claude-review-analysis.md"
+            echo "" >> "$RUN_DIR/claude-review-analysis.md"
+            echo "The merge decision workflow should use fallback methods to access the review content." >> "$RUN_DIR/claude-review-analysis.md"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload review analysis
+        if: always()  # Upload even if review has issues
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-review-analysis-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          path: /tmp/claude-review-${{ github.run_id }}-${{ github.run_attempt }}/claude-review-analysis.md
+          retention-days: 7

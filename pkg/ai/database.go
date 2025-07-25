@@ -181,7 +181,9 @@ func (d *Database) GetAnalysisHistory(clusterName string, since time.Time) ([]An
 	if err != nil {
 		return nil, fmt.Errorf("failed to query analysis history: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var sessions []AnalysisSession
 	for rows.Next() {
@@ -222,7 +224,8 @@ func (d *Database) StorePattern(pattern *ClusterPattern) error {
 		pattern.ClusterName, pattern.PatternType, pattern.PatternName,
 	).Scan(&existingID)
 
-	if err == sql.ErrNoRows {
+	switch err {
+	case sql.ErrNoRows:
 		// Insert new pattern
 		query := `
 			INSERT INTO cluster_patterns 
@@ -241,7 +244,7 @@ func (d *Database) StorePattern(pattern *ClusterPattern) error {
 		if err != nil {
 			return fmt.Errorf("failed to insert pattern: %w", err)
 		}
-	} else if err == nil {
+	case nil:
 		// Update existing pattern
 		query := `
 			UPDATE cluster_patterns 
@@ -258,7 +261,7 @@ func (d *Database) StorePattern(pattern *ClusterPattern) error {
 		if err != nil {
 			return fmt.Errorf("failed to update pattern: %w", err)
 		}
-	} else {
+	default:
 		return fmt.Errorf("failed to check existing pattern: %w", err)
 	}
 
@@ -279,7 +282,9 @@ func (d *Database) GetPatterns(clusterName string, patternType string) ([]Cluste
 	if err != nil {
 		return nil, fmt.Errorf("failed to query patterns: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var patterns []ClusterPattern
 	for rows.Next() {

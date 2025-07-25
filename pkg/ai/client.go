@@ -194,23 +194,27 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create prompt file: %w", err)
 	}
-	defer os.Remove(promptFile.Name())
+	defer func() {
+		_ = os.Remove(promptFile.Name())
+	}()
 	
 	if _, err := promptFile.WriteString(sanitizedPrompt); err != nil {
 		return "", fmt.Errorf("failed to write prompt: %w", err)
 	}
-	promptFile.Close()
+	_ = promptFile.Close()
 
 	systemPromptFile, err := os.CreateTemp("", "claude-system-*.txt")
 	if err != nil {
 		return "", fmt.Errorf("failed to create system prompt file: %w", err)
 	}
-	defer os.Remove(systemPromptFile.Name())
+	defer func() {
+		_ = os.Remove(systemPromptFile.Name())
+	}()
 	
 	if _, err := systemPromptFile.WriteString(c.systemPrompt); err != nil {
 		return "", fmt.Errorf("failed to write system prompt: %w", err)
 	}
-	systemPromptFile.Close()
+	_ = systemPromptFile.Close()
 
 	// Use shell execution to inherit proper environment (like kubectl executor)
 	// This ensures Node.js/NVM environment is available for Claude CLI
