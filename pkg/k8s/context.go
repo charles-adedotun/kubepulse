@@ -189,7 +189,7 @@ func (cm *ContextManager) getOrCreateClient(contextName string) (kubernetes.Inte
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Test the connection with 10 second timeout  
+	// Test the connection with 10 second timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

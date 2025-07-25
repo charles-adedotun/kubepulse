@@ -17,21 +17,21 @@ import (
 
 // Engine is the core monitoring engine
 type Engine struct {
-	client        kubernetes.Interface
+	client         kubernetes.Interface
 	currentContext string // Track current context
-	checks        []HealthCheck
-	interval      time.Duration
-	results       map[string]CheckResult
-	resultsMu     sync.RWMutex
-	ctx           context.Context
-	cancel        context.CancelFunc
-	alertChan     chan Alert
-	metricsChan   chan Metric
-	alertManager  *alerts.Manager
-	anomalyEngine *ml.AnomalyDetector
-	sloTracker    *slo.Tracker
-	aiClient      *ai.Client
-	errorHandler  *ErrorHandler
+	checks         []HealthCheck
+	interval       time.Duration
+	results        map[string]CheckResult
+	resultsMu      sync.RWMutex
+	ctx            context.Context
+	cancel         context.CancelFunc
+	alertChan      chan Alert
+	metricsChan    chan Metric
+	alertManager   *alerts.Manager
+	anomalyEngine  *ml.AnomalyDetector
+	sloTracker     *slo.Tracker
+	aiClient       *ai.Client
+	errorHandler   *ErrorHandler
 
 	// New AI components
 	predictiveAnalyzer *ai.PredictiveAnalyzer
@@ -42,13 +42,13 @@ type Engine struct {
 
 // EngineConfig holds configuration for the monitoring engine
 type EngineConfig struct {
-	KubeClient     kubernetes.Interface
-	ContextName    string // Name of the current context
-	Interval       time.Duration
-	AlertChan      chan Alert
-	MetricsChan    chan Metric
-	EnableAI       bool
-	AIConfig       *ai.Config
+	KubeClient  kubernetes.Interface
+	ContextName string // Name of the current context
+	Interval    time.Duration
+	AlertChan   chan Alert
+	MetricsChan chan Metric
+	EnableAI    bool
+	AIConfig    *ai.Config
 }
 
 // NewEngine creates a new monitoring engine

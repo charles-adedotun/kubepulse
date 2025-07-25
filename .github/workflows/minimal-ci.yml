@@ -54,20 +54,8 @@ jobs:
         go vet ./pkg/slo/...
         echo "✅ Go vet passed"
 
-  claude-review:
-    name: Claude Code Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: Claude PR Review
-      uses: charles-adedotun/claude-code-review@v1
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        claude-token: ${{ secrets.CLAUDE_TOKEN }}
-        review-level: 'standard'
-        auto-approve-simple: false  # Always require human review for now
+  # TODO: Add Claude Code Review integration once action is available
+  # claude-review:
+  #   name: Claude Code Review
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'pull_request'
