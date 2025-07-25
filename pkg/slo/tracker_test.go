@@ -9,19 +9,19 @@ func TestNewTracker(t *testing.T) {
 	tracker := NewTracker()
 	
 	if tracker == nil {
-		t.Error("expected non-nil tracker")
+		t.Fatal("expected non-nil tracker")
 	}
 	
 	if tracker.slos == nil {
-		t.Error("expected initialized slos map")
+		t.Fatal("expected initialized slos map")
 	}
 	
 	if tracker.status == nil {
-		t.Error("expected initialized status map")
+		t.Fatal("expected initialized status map")
 	}
 	
 	if tracker.metrics == nil {
-		t.Error("expected initialized metrics map")
+		t.Fatal("expected initialized metrics map")
 	}
 }
 
