@@ -4,9 +4,15 @@ import { Moon, Sun } from "lucide-react"
 import { useSystemTheme } from "@/hooks/useSystemTheme"
 import { ContextSelector } from "@/components/dashboard/ContextSelector"
 
+interface KubernetesContext {
+  name: string
+  cluster_name: string
+  namespace: string
+}
+
 interface HeaderProps {
   connectionStatus: "connected" | "disconnected" | "connecting"
-  onContextChange?: (context: any) => void
+  onContextChange?: (context: KubernetesContext) => void
 }
 
 export function Header({ connectionStatus, onContextChange }: HeaderProps) {

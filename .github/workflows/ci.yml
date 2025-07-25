@@ -129,13 +129,16 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
+    - name: Install Gosec
+      run: |
+        curl -sfL https://raw.githubusercontent.com/securecodewarrior/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.18.2
+        
     - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-fmt sarif -out gosec-results.sarif ./...'
+      run: |
+        $(go env GOPATH)/bin/gosec -fmt sarif -out gosec-results.sarif ./...
         
     - name: Upload SARIF Results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: gosec-results.sarif
