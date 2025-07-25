@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { config, wsUrl } from '@/config'
 
 export interface DashboardData {
@@ -26,7 +26,7 @@ export function useWebSocket() {
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const connect = () => {
+  const connect = useCallback(() => {
     const websocketUrl = wsUrl()
 
     try {
@@ -82,7 +82,7 @@ export function useWebSocket() {
         connect()
       }, config.ui.reconnectDelay)
     }
-  }
+  }, [])
 
   useEffect(() => {
     connect()

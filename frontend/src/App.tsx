@@ -40,17 +40,6 @@ interface NodeDetail {
   [key: string]: unknown
 }
 
-interface CheckData {
-  name: string
-  status: string
-  message: string
-  timestamp?: string
-  duration?: number
-  metrics?: EnhancedMetric[]
-  details?: {
-    nodes?: NodeDetail[]
-  }
-}
 
 interface ScoreData {
   weighted: number
