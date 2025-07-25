@@ -88,7 +88,7 @@ func TestSLOStatus(t *testing.T) {
 
 func TestMetric(t *testing.T) {
 	now := time.Now()
-	
+
 	metric := Metric{
 		Name:      "response_time",
 		Value:     125.5,
