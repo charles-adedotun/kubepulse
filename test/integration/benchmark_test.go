@@ -12,7 +12,7 @@ import (
 // BenchmarkEngineCreation benchmarks engine creation performance
 func BenchmarkEngineCreation(b *testing.B) {
 	fakeClient := fake.NewSimpleClientset()
-	
+
 	engineConfig := core.EngineConfig{
 		KubeClient:  fakeClient,
 		ContextName: "benchmark-context",
@@ -32,7 +32,7 @@ func BenchmarkEngineCreation(b *testing.B) {
 // BenchmarkHealthCheckExecution benchmarks health check execution
 func BenchmarkHealthCheckExecution(b *testing.B) {
 	fakeClient := fake.NewSimpleClientset()
-	
+
 	engineConfig := core.EngineConfig{
 		KubeClient:  fakeClient,
 		ContextName: "benchmark-context",
@@ -54,10 +54,10 @@ func BenchmarkHealthCheckExecution(b *testing.B) {
 // BenchmarkMemoryAllocation benchmarks memory usage patterns
 func BenchmarkMemoryAllocation(b *testing.B) {
 	fakeClient := fake.NewSimpleClientset()
-	
+
 	b.ReportAllocs()
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		engineConfig := core.EngineConfig{
 			KubeClient:  fakeClient,
@@ -65,11 +65,11 @@ func BenchmarkMemoryAllocation(b *testing.B) {
 			Interval:    time.Second,
 			EnableAI:    false,
 		}
-		
+
 		engine := core.NewEngine(engineConfig)
 		podCheck := health.NewPodHealthCheck()
 		engine.AddCheck(podCheck)
-		
+
 		// Simulate some work
 		_ = engine.GetResults()
 	}
