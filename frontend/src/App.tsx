@@ -19,19 +19,12 @@ interface KubernetesContext {
   namespace: string
 }
 
-interface MetricLabels {
-  [key: string]: string
-  node?: string
-}
-
-
 interface NodeDetail {
   ready: boolean
   cpu_percent?: number
   memory_percent?: number
   [key: string]: unknown
 }
-
 
 interface ScoreData {
   weighted: number
