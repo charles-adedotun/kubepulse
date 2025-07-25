@@ -29,7 +29,7 @@ WORKDIR /app/frontend
 
 # Copy package files
 COPY frontend/package*.json ./
-RUN npm ci
+RUN rm -rf node_modules package-lock.json && npm install
 
 # Copy frontend source
 COPY frontend/ .
