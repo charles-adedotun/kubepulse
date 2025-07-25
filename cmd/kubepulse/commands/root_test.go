@@ -191,8 +191,8 @@ func TestGlobalVariables(t *testing.T) {
 	var _ string = contextName
 
 	// These variables should be declared (may be nil initially)
-	if &k8sClient == nil {
-		t.Error("k8sClient variable should be declared")
+	if k8sClient == nil {
+		t.Log("k8sClient is nil (expected initially)")
 	}
 }
 
