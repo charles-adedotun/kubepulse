@@ -2,77 +2,154 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    types: [opened, synchronize, reopened]
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-    
     runs-on: ubuntu-latest
+    # Skip bot PRs
+    if: ${{ \!contains(github.actor, 'bot') && \!contains(github.actor, 'dependabot') }}
+    
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
-      id-token: write
-    
+      pull-requests: write
+      issues: write
+      actions: read
+      checks: read
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Run Claude Code Review
-        id: claude-review
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-3-5-sonnet-20241022
+          prompt: |
+            You are reviewing a pull request for KubePulse, an intelligent Kubernetes health monitoring tool with ML-powered anomaly detection.
 
-          # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)
-          # model: "claude-opus-4-20250514"
+            ## Project Context
+            - **Tech Stack**: Go backend, React/TypeScript frontend, Kubernetes integration
+            - **Key Components**: AI/ML anomaly detection, health checks, monitoring engine, web dashboard
+            - **Testing Strategy**: Progressive test coverage improvement, comprehensive unit/integration tests
+
+            ## Review Focus Areas
+
+            ### 1. Code Quality & Architecture
+            - Go code follows best practices (error handling, concurrency safety, interfaces)
+            - React/TypeScript components are well-structured and type-safe
+            - Kubernetes resource definitions are valid and secure
+            - AI/ML algorithms are efficient and mathematically sound
+
+            ### 2. Security Analysis
+            - No hardcoded secrets or credentials
+            - Proper input validation and sanitization
+            - Secure Kubernetes RBAC configurations
+            - Safe API endpoint implementations
+
+            ### 3. Performance & Scalability
+            - Efficient Go code with proper resource management
+            - Frontend bundle optimization and lazy loading
+            - Database queries and caching strategies
+            - Kubernetes resource limits and requests
+
+            ### 4. Testing & Coverage
+            - Comprehensive test coverage for new functionality
+            - Integration tests for Kubernetes components
+            - Frontend component testing with proper mocking
+            - AI/ML algorithm validation tests
+
+            ### 5. KubePulse-Specific Concerns
+            - Health check logic accuracy and reliability
+            - Anomaly detection algorithm correctness
+            - Monitoring engine performance and stability
+            - Dashboard responsiveness and user experience
+
+            ## Review Output Format
+            Please provide:
+            1. **Overall Assessment** (APPROVE/CHANGES_REQUESTED/COMMENT)
+            2. **Critical Issues** (security, bugs, breaking changes)
+            3. **Code Quality Issues** (style, best practices, maintainability)
+            4. **Performance Concerns** (efficiency, scalability, resource usage)
+            5. **Testing Gaps** (missing tests, inadequate coverage)
+            6. **Recommendations** (improvements, optimizations, alternatives)
+
+            Focus on actionable feedback that improves code quality, security, and maintainability while supporting KubePulse's mission of intelligent Kubernetes monitoring.
+
+      - name: Capture Review Content
+        id: capture_review
+        shell: bash
+        run: |
+          echo "Capturing Claude review content..."
           
-          # Direct prompt for automated review (no @claude mention needed)
-          direct_prompt: |
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+          # Wait for review to be processed
+          max_attempts=30
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt/$max_attempts: Checking for review content..."
             
-            Be constructive and helpful in your feedback.
+            # Check if review content is available
+            if [ -f "/tmp/claude_review.md" ]; then
+              echo "Review content found\!"
+              review_size=$(wc -c < /tmp/claude_review.md)
+              echo "Review size: $review_size bytes"
+              
+              if [ $review_size -gt 100 ]; then
+                echo "Review content appears complete"
+                echo "review_ready=true" >> $GITHUB_OUTPUT
+                break
+              fi
+            fi
+            
+            echo "Waiting for review content... (${attempt}/${max_attempts})"
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          if [ $attempt -gt $max_attempts ]; then
+            echo "Warning: Review content not captured within timeout"
+            echo "review_ready=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Create review analysis artifact
+          {
+            echo "# Claude Code Review Analysis"
+            echo ""
+            echo "**PR**: #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
+            echo "**Author**: ${{ github.event.pull_request.user.login }}"
+            echo "**Branch**: ${{ github.event.pull_request.head.ref }}"
+            echo "**Commit**: ${{ github.event.pull_request.head.sha }}"
+            echo "**Created**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            
+            if [ -f "/tmp/claude_review.md" ]; then
+              echo "## Review Content"
+              echo ""
+              cat /tmp/claude_review.md
+            else
+              echo "## Review Status"
+              echo "⚠️ Review content not available - please check workflow logs"
+            fi
+            
+            echo ""
+            echo "## Metrics"
+            echo "- Capture attempts: $attempt"
+            echo "- Max attempts: $max_attempts" 
+            echo "- Review ready: $([ -f "/tmp/claude_review.md" ] && echo "✅ Yes" || echo "❌ No")"
+            
+          } > /tmp/review_analysis.md
 
-          # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
-          # use_sticky_comment: true
-          
-          # Optional: Customize review based on file types
-          # direct_prompt: |
-          #   Review this PR focusing on:
-          #   - For TypeScript files: Type safety and proper interface usage
-          #   - For API endpoints: Security, input validation, and error handling
-          #   - For React components: Performance, accessibility, and best practices
-          #   - For tests: Coverage, edge cases, and test quality
-          
-          # Optional: Different prompts for different authors
-          # direct_prompt: |
-          #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 
-          #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
-          #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
-          
-          # Optional: Add specific tools for running tests or linting
-          # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
-          
-          # Optional: Skip review for certain conditions
-          # if: |
-          #   !contains(github.event.pull_request.title, '[skip-review]') &&
-          #   !contains(github.event.pull_request.title, '[WIP]')
-
+      - name: Upload Review Analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-review-analysis-${{ github.event.pull_request.number }}
+          path: /tmp/review_analysis.md
+          retention-days: 7
+          if-no-files-found: warn
+EOF < /dev/null

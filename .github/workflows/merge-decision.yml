@@ -1,0 +1,232 @@
+name: AI Merge Decision
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["Claude Code Review", "CI"]
+    types: [completed]
+
+jobs:
+  wait-for-checks:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.actor, 'bot') && !contains(github.actor, 'dependabot') }}
+    
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
+      
+    outputs:
+      pr_number: ${{ steps.get_pr.outputs.pr_number }}
+      checks_passed: ${{ steps.check_status.outputs.checks_passed }}
+      
+    steps:
+      - name: Get PR Number
+        id: get_pr
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            pr_number=$(gh pr list --repo ${{ github.repository }} --head ${{ github.event.workflow_run.head_branch }} --json number --jq '.[0].number // empty')
+            echo "pr_number=${pr_number}" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for CI Checks
+        id: check_status
+        run: |
+          pr_number="${{ steps.get_pr.outputs.pr_number }}"
+          if [ -z "$pr_number" ]; then
+            echo "No PR number found, skipping check"
+            echo "checks_passed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Waiting for checks on PR #${pr_number}"
+          max_wait=1800
+          wait_time=0
+          
+          while [ $wait_time -lt $max_wait ]; do
+            check_status=$(gh pr view $pr_number --repo ${{ github.repository }} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED") | .status' | head -1)
+            
+            if [ -z "$check_status" ]; then
+              failed_checks=$(gh pr view $pr_number --repo ${{ github.repository }} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED") | .name')
+              
+              if [ -z "$failed_checks" ]; then
+                echo "All checks passed!"
+                echo "checks_passed=true" >> $GITHUB_OUTPUT
+                exit 0
+              else
+                echo "Some checks failed: $failed_checks"
+                echo "checks_passed=false" >> $GITHUB_OUTPUT
+                exit 0
+              fi
+            fi
+            
+            echo "Waiting for checks to complete... (${wait_time}s/${max_wait}s)"
+            sleep 30
+            wait_time=$((wait_time + 30))
+          done
+          
+          echo "Timeout waiting for checks"
+          echo "checks_passed=false" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  merge-decision:
+    runs-on: ubuntu-latest
+    needs: wait-for-checks
+    if: ${{ needs.wait-for-checks.outputs.pr_number != '' }}
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      checks: read
+      
+    outputs:
+      decision: ${{ steps.parse_decision.outputs.decision }}
+      reason: ${{ steps.parse_decision.outputs.reason }}
+      
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Generate Merge Decision Prompt
+        id: merge_prompt
+        run: |
+          bash .github/scripts/generate-merge-prompt.sh ${{ needs.wait-for-checks.outputs.pr_number }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHECKS_PASSED: ${{ needs.wait-for-checks.outputs.checks_passed }}
+
+      - name: AI Merge Decision
+        id: ai_decision
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-3-5-sonnet-20241022
+          prompt_file: /tmp/merge-decision-prompt.md
+          
+      - name: Parse Decision
+        id: parse_decision
+        run: |
+          if [ -f "/tmp/ai_decision.json" ]; then
+            decision=$(jq -r '.decision // "MANUAL_APPROVAL"' /tmp/ai_decision.json)
+            reason=$(jq -r '.reason // "No reason provided"' /tmp/ai_decision.json)
+            critical_issues=$(jq -r '.critical_issues // []' /tmp/ai_decision.json)
+          else
+            decision="MANUAL_APPROVAL"
+            reason="AI decision not available"
+            critical_issues="[]"
+          fi
+          
+          echo "decision=$decision" >> $GITHUB_OUTPUT
+          echo "reason=$reason" >> $GITHUB_OUTPUT
+          echo "critical_issues=$critical_issues" >> $GITHUB_OUTPUT
+
+      - name: Generate TODO List for Rejected PRs
+        if: ${{ steps.parse_decision.outputs.decision == 'REJECT' }}
+        run: |
+          bash .github/scripts/generate-todo-list.sh "${{ steps.parse_decision.outputs.reason }}" "${{ steps.parse_decision.outputs.critical_issues }}"
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const decision = '${{ steps.parse_decision.outputs.decision }}';
+            const reason = '${{ steps.parse_decision.outputs.reason }}';
+            const prNumber = ${{ needs.wait-for-checks.outputs.pr_number }};
+            
+            let emoji, status, action;
+            
+            switch(decision) {
+              case 'APPROVE':
+                emoji = '✅';
+                status = 'Approved for auto-merge';
+                action = 'This PR will be automatically merged.';
+                break;
+              case 'MANUAL_APPROVAL':
+                emoji = '👀';
+                status = 'Requires manual review';  
+                action = 'Please review manually before merging.';
+                break;
+              case 'REJECT':
+                emoji = '❌';
+                status = 'Changes requested';
+                action = 'Please address the issues below before merging.';
+                break;
+              default:
+                emoji = '🤖';
+                status = 'AI decision pending';
+                action = 'Waiting for AI analysis.';
+            }
+            
+            let comment = `## ${emoji} AI Merge Decision: ${status}\n\n`;
+            comment += `**Reason**: ${reason}\n\n`;
+            comment += `**Action**: ${action}\n\n`;
+            comment += '*This decision was made by Claude AI based on code quality, tests, and project standards.*';
+            
+            if (decision === 'REJECT') {
+              const fs = require('fs');
+              if (fs.existsSync('/tmp/todo-items.md')) {
+                const todoList = fs.readFileSync('/tmp/todo-items.md', 'utf8');
+                comment += '\n\n## TODO List\n\n' + todoList;
+              }
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: comment
+            });
+
+  auto-merge:
+    runs-on: ubuntu-latest
+    needs: [wait-for-checks, merge-decision]
+    if: ${{ needs.merge-decision.outputs.decision == 'APPROVE' && needs.wait-for-checks.outputs.checks_passed == 'true' }}
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      
+    steps:
+      - name: Auto-merge PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ needs.wait-for-checks.outputs.pr_number }};
+            
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                merge_method: 'squash',
+                commit_title: `Auto-merge PR #${prNumber}`,
+                commit_message: 'Automatically merged by AI after passing all checks and reviews.'
+              });
+              
+              console.log(`Successfully auto-merged PR #${prNumber}`);
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '🎉 **Auto-merged successfully!**\n\nThis PR was automatically merged after passing all AI reviews and checks.'
+              });
+              
+            } catch (error) {
+              console.error('Auto-merge failed:', error);
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '⚠️ **Auto-merge failed**\n\nThe AI approved this PR but automatic merging failed. Please merge manually.\n\nError: ' + error.message
+              });
+            }
