@@ -8,7 +8,7 @@ import (
 
 func TestEngineError_Error(t *testing.T) {
 	baseErr := errors.New("connection failed")
-	
+
 	tests := []struct {
 		name     string
 		err      *EngineError
@@ -52,7 +52,7 @@ func TestEngineError_Error(t *testing.T) {
 func TestEngineError_Unwrap(t *testing.T) {
 	baseErr := errors.New("base error")
 	err := &EngineError{Cause: baseErr}
-	
+
 	if err.Unwrap() != baseErr {
 		t.Errorf("expected unwrapped error to be base error")
 	}
@@ -60,10 +60,10 @@ func TestEngineError_Unwrap(t *testing.T) {
 
 func TestNewEngineError(t *testing.T) {
 	baseErr := errors.New("base error")
-	
+
 	err := NewEngineError(
 		"test-component",
-		"test-operation", 
+		"test-operation",
 		ErrorCategoryHealth,
 		ErrorSeverityHigh,
 		"test message",
@@ -73,31 +73,31 @@ func TestNewEngineError(t *testing.T) {
 	if err.Component != "test-component" {
 		t.Errorf("expected component 'test-component', got %s", err.Component)
 	}
-	
+
 	if err.Operation != "test-operation" {
 		t.Errorf("expected operation 'test-operation', got %s", err.Operation)
 	}
-	
+
 	if err.Category != ErrorCategoryHealth {
 		t.Errorf("expected category %s, got %s", ErrorCategoryHealth, err.Category)
 	}
-	
+
 	if err.Severity != ErrorSeverityHigh {
 		t.Errorf("expected severity %s, got %s", ErrorSeverityHigh, err.Severity)
 	}
-	
+
 	if err.Message != "test message" {
 		t.Errorf("expected message 'test message', got %s", err.Message)
 	}
-	
+
 	if err.Cause != baseErr {
 		t.Errorf("expected cause to be base error")
 	}
-	
+
 	if err.ID == "" {
 		t.Error("expected non-empty error ID")
 	}
-	
+
 	if err.Recoverable != true {
 		t.Error("expected non-critical error to be recoverable")
 	}
@@ -105,10 +105,10 @@ func TestNewEngineError(t *testing.T) {
 
 func TestEngineError_IsRecoverable(t *testing.T) {
 	tests := []struct {
-		name       string
-		severity   ErrorSeverity
+		name        string
+		severity    ErrorSeverity
 		recoverable bool
-		expected   bool
+		expected    bool
 	}{
 		{"critical error", ErrorSeverityCritical, true, false},
 		{"high error", ErrorSeverityHigh, true, true},
@@ -122,7 +122,7 @@ func TestEngineError_IsRecoverable(t *testing.T) {
 				Severity:    tt.severity,
 				Recoverable: tt.recoverable,
 			}
-			
+
 			if err.IsRecoverable() != tt.expected {
 				t.Errorf("expected IsRecoverable() to be %v, got %v", tt.expected, err.IsRecoverable())
 			}
@@ -161,11 +161,11 @@ func TestErrorHandler(t *testing.T) {
 	// Test handling non-critical error
 	err := NewEngineError("test", "op", ErrorCategoryHealth, ErrorSeverityMedium, "test", nil)
 	result := handler.Handle(err)
-	
+
 	if result != nil {
 		t.Errorf("expected nil for non-critical error, got %v", result)
 	}
-	
+
 	if callbackErr == nil {
 		t.Error("expected callback to be called")
 	}
@@ -173,7 +173,7 @@ func TestErrorHandler(t *testing.T) {
 	// Test handling critical error
 	criticalErr := NewEngineError("test", "op", ErrorCategoryHealth, ErrorSeverityCritical, "critical", nil)
 	result = handler.Handle(criticalErr)
-	
+
 	if result == nil {
 		t.Error("expected error for critical error")
 	}
@@ -182,15 +182,15 @@ func TestErrorHandler(t *testing.T) {
 func TestNewHealthCheckError(t *testing.T) {
 	baseErr := errors.New("check failed")
 	err := NewHealthCheckError("pod-check", "validate", "Pod validation failed", baseErr)
-	
+
 	if err.Component != "pod-check" {
 		t.Errorf("expected component 'pod-check', got %s", err.Component)
 	}
-	
+
 	if err.Category != ErrorCategoryHealth {
 		t.Errorf("expected category %s, got %s", ErrorCategoryHealth, err.Category)
 	}
-	
+
 	if err.Severity != ErrorSeverityMedium {
 		t.Errorf("expected severity %s, got %s", ErrorSeverityMedium, err.Severity)
 	}
