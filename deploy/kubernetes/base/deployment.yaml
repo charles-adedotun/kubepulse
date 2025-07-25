@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubepulse
+  labels:
+    app: kubepulse
+    version: latest
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kubepulse
+  template:
+    metadata:
+      labels:
+        app: kubepulse
+        version: latest
+    spec:
+      serviceAccountName: kubepulse
+      containers:
+      - name: kubepulse
+        image: ghcr.io/charles-adedotun/kubepulse:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: PORT
+          value: "8080"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubepulse
+  labels:
+    app: kubepulse
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubepulse
+  labels:
+    app: kubepulse
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "nodes", "namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubepulse
+  labels:
+    app: kubepulse
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubepulse
+subjects:
+- kind: ServiceAccount
+  name: kubepulse
+  namespace: default

@@ -13,8 +13,14 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the Go binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o kubepulse ./cmd/kubepulse
+# Build the Go binary with version info
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags "-w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildDate=${BUILD_DATE}" \
+    -o kubepulse ./cmd/kubepulse
 
 # Build stage for React frontend
 FROM node:20-alpine AS frontend-builder
