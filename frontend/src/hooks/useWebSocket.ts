@@ -71,7 +71,7 @@ export function useWebSocket() {
       console.error('WebSocket connection failed:', error)
       setConnectionStatus('disconnected')
     }
-  }
+  }, [])
 
   const attemptReconnect = useCallback(() => {
     if (reconnectAttemptsRef.current < config.ui.maxReconnectAttempts) {
