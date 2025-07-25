@@ -653,8 +653,9 @@ func (s *Server) handleSwitchContext(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update engine with new client
-	// Note: This requires adding a method to update the engine's client
-	// For now, we'll just return success
+	// TODO: This requires adding a method to update the engine's client
+	// For now, we'll just acknowledge the client exists
+	_ = client
 
 	// Get updated context info
 	context, err := s.contextManager.GetCurrentContext()
