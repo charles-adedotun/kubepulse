@@ -93,7 +93,7 @@ function App() {
             description={`Nodes Ready | Avg CPU: ${Math.round(clusterStats.avgCpuUsage)}%`}
             status="healthy"
           />
-          {config.features.aiInsights && (
+          {config.ui.features.aiInsights && (
             <StatusCard
               title="AI Confidence"
               value={insights ? `${Math.round((insights.ai_confidence || 0) * 100)}%` : '--'}
@@ -105,15 +105,15 @@ function App() {
 
         {/* Main Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full grid-cols-${1 + (config.features.nodeDetails ? 1 : 0) + (config.features.aiInsights ? 1 : 0) + (config.features.predictiveAnalytics ? 1 : 0)}`}>
+          <TabsList className={`grid w-full grid-cols-${1 + (config.ui.features.nodeDetails ? 1 : 0) + (config.ui.features.aiInsights ? 1 : 0) + (config.ui.features.predictiveAnalytics ? 1 : 0)}`}>
             <TabsTrigger value="overview" data-state={activeTab === 'overview' ? 'active' : ''}>Overview</TabsTrigger>
-            {config.features.nodeDetails && (
+            {config.ui.features.nodeDetails && (
               <TabsTrigger value="nodes" data-state={activeTab === 'nodes' ? 'active' : ''}>Node Details</TabsTrigger>
             )}
-            {config.features.aiInsights && (
+            {config.ui.features.aiInsights && (
               <TabsTrigger value="ai-insights" data-state={activeTab === 'ai-insights' ? 'active' : ''}>AI Insights</TabsTrigger>
             )}
-            {config.features.predictiveAnalytics && (
+            {config.ui.features.predictiveAnalytics && (
               <TabsTrigger value="predictions" data-state={activeTab === 'predictions' ? 'active' : ''}>Predictions</TabsTrigger>
             )}
           </TabsList>
@@ -137,7 +137,7 @@ function App() {
             />
           </TabsContent>
 
-          {config.features.nodeDetails && (
+          {config.ui.features.nodeDetails && (
             <TabsContent value="nodes" className="space-y-6">
               <NodeDetailsPanel 
                 nodes={nodeDetails}
@@ -146,7 +146,7 @@ function App() {
             </TabsContent>
           )}
 
-          {config.features.aiInsights && (
+          {config.ui.features.aiInsights && (
             <TabsContent value="ai-insights" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <AIInsights 
@@ -154,12 +154,12 @@ function App() {
                   loading={aiLoading}
                   error={aiError || undefined}
                 />
-                {config.features.smartAlerts && <SmartAlerts />}
+                {config.ui.features.smartAlerts && <SmartAlerts />}
               </div>
             </TabsContent>
           )}
 
-          {config.features.predictiveAnalytics && (
+          {config.ui.features.predictiveAnalytics && (
             <TabsContent value="predictions" className="space-y-6">
               <PredictiveAnalytics 
                 clusterHealth={data}
