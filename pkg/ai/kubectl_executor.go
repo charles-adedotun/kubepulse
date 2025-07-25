@@ -56,15 +56,25 @@ func (e *KubectlExecutor) Execute(ctx context.Context, clusterName, command stri
 	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
-	// Parse command
+	// Parse command with strict validation
 	parts := strings.Fields(command)
 	if len(parts) == 0 || parts[0] != "kubectl" {
 		return nil, fmt.Errorf("invalid kubectl command: %s", command)
 	}
 
+	// Additional validation: ensure no shell metacharacters or path traversal
+	for _, part := range parts[1:] {
+		if containsShellMetacharacters(part) {
+			return nil, fmt.Errorf("invalid characters in command argument: %s", part)
+		}
+		if strings.Contains(part, "..") || strings.HasPrefix(part, "/") {
+			return nil, fmt.Errorf("path traversal attempt detected in argument: %s", part)
+		}
+	}
+
 	klog.V(3).Infof("Executing kubectl command: %s", command)
 
-	// Execute command
+	// Execute command with validated arguments
 	cmd := exec.CommandContext(ctx, e.kubectlPath, parts[1:]...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -156,8 +166,11 @@ func (e *KubectlExecutor) storeExecution(execution *KubectlExecution) error {
 		execution.ExecutionTime.Milliseconds(),
 		execution.AnalysisSessionID,
 	)
-
-	return err
+	
+	if err != nil {
+		return fmt.Errorf("failed to store kubectl execution: %w", err)
+	}
+	return nil
 }
 
 // getAllowedCommands returns the list of allowed kubectl commands
@@ -316,4 +329,21 @@ func (e *KubectlExecutor) GetExecutionHistory(clusterName string, since time.Tim
 	}
 
 	return executions, nil
+}
+
+// containsShellMetacharacters checks if a string contains shell metacharacters
+// that could be used for command injection
+func containsShellMetacharacters(s string) bool {
+	// List of dangerous shell metacharacters
+	dangerousChars := []string{
+		";", "&", "|", "`", "$", "(", ")", "{", "}", "[", "]",
+		"<", ">", "\\", "!", "*", "?", "~", "'", "\"", "\n", "\r",
+	}
+	
+	for _, char := range dangerousChars {
+		if strings.Contains(s, char) {
+			return true
+		}
+	}
+	return false
 }

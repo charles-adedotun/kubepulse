@@ -61,6 +61,43 @@ export function useWebSocket() {
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Extract message handler to avoid duplication
+  const handleWebSocketMessage = useCallback((event: MessageEvent) => {
+    try {
+      // Validate that we received valid JSON
+      if (!event.data || typeof event.data !== 'string') {
+        console.warn('Received invalid WebSocket data format:', typeof event.data)
+        return
+      }
+
+      const parsedData = JSON.parse(event.data)
+      
+      // Validate parsed data structure
+      if (!parsedData || typeof parsedData !== 'object') {
+        console.warn('Parsed WebSocket data is not a valid object:', parsedData)
+        return
+      }
+      
+      // Handle context switch events
+      if (parsedData.type === 'context_switched') {
+        console.log('Context switched:', parsedData.context)
+        // Clear current data to show loading state
+        setData(null)
+      } else {
+        // Validate health data structure before setting
+        if (isValidDashboardData(parsedData)) {
+          setData(parsedData)
+        } else {
+          console.warn('Received invalid dashboard data structure:', parsedData)
+          // Don't update data with invalid structure
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse WebSocket data:', error, 'Raw data:', event.data)
+      // Don't crash the WebSocket connection on parse errors
+    }
+  }, [])
+
   const attemptReconnect = useCallback(() => {
     if (reconnectAttemptsRef.current < config.ui.maxReconnectAttempts) {
       reconnectAttemptsRef.current++
@@ -79,41 +116,7 @@ export function useWebSocket() {
             reconnectAttemptsRef.current = 0
           }
 
-          ws.onmessage = (event) => {
-            try {
-              // Validate that we received valid JSON
-              if (!event.data || typeof event.data !== 'string') {
-                console.warn('Received invalid WebSocket data format:', typeof event.data)
-                return
-              }
-
-              const parsedData = JSON.parse(event.data)
-              
-              // Validate parsed data structure
-              if (!parsedData || typeof parsedData !== 'object') {
-                console.warn('Parsed WebSocket data is not a valid object:', parsedData)
-                return
-              }
-              
-              // Handle context switch events
-              if (parsedData.type === 'context_switched') {
-                console.log('Context switched:', parsedData.context)
-                // Clear current data to show loading state
-                setData(null)
-              } else {
-                // Validate health data structure before setting
-                if (isValidDashboardData(parsedData)) {
-                  setData(parsedData)
-                } else {
-                  console.warn('Received invalid dashboard data structure:', parsedData)
-                  // Don't update data with invalid structure
-                }
-              }
-            } catch (error) {
-              console.error('Failed to parse WebSocket data:', error, 'Raw data:', event.data)
-              // Don't crash the WebSocket connection on parse errors
-            }
-          }
+          ws.onmessage = handleWebSocketMessage
 
           ws.onclose = () => {
             console.log('WebSocket disconnected')
@@ -146,41 +149,7 @@ export function useWebSocket() {
         reconnectAttemptsRef.current = 0
       }
 
-      ws.onmessage = (event) => {
-        try {
-          // Validate that we received valid JSON
-          if (!event.data || typeof event.data !== 'string') {
-            console.warn('Received invalid WebSocket data format:', typeof event.data)
-            return
-          }
-
-          const parsedData = JSON.parse(event.data)
-          
-          // Validate parsed data structure
-          if (!parsedData || typeof parsedData !== 'object') {
-            console.warn('Parsed WebSocket data is not a valid object:', parsedData)
-            return
-          }
-          
-          // Handle context switch events
-          if (parsedData.type === 'context_switched') {
-            console.log('Context switched:', parsedData.context)
-            // Clear current data to show loading state
-            setData(null)
-          } else {
-            // Validate health data structure before setting
-            if (isValidDashboardData(parsedData)) {
-              setData(parsedData)
-            } else {
-              console.warn('Received invalid dashboard data structure:', parsedData)
-              // Don't update data with invalid structure
-            }
-          }
-        } catch (error) {
-          console.error('Failed to parse WebSocket data:', error, 'Raw data:', event.data)
-          // Don't crash the WebSocket connection on parse errors
-        }
-      }
+      ws.onmessage = handleWebSocketMessage
 
       ws.onclose = () => {
         console.log('WebSocket disconnected')

@@ -216,12 +216,15 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	}
 	_ = systemPromptFile.Close()
 
-	// Use shell execution to inherit proper environment (like kubectl executor)
-	// This ensures Node.js/NVM environment is available for Claude CLI
-	// Using file paths prevents injection since the content is in files, not in the command line
-	cmdLine := fmt.Sprintf("%s -p @%s --max-turns 1 --system-prompt @%s --permission-mode bypassPermissions",
-		c.claudePath, promptFile.Name(), systemPromptFile.Name())
-	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine)
+	// Use direct command execution to prevent shell injection vulnerabilities
+	// File paths are used for prompt content to avoid command line injection
+	args := []string{
+		"-p", "@" + promptFile.Name(),
+		"--max-turns", "1",
+		"--system-prompt", "@" + systemPromptFile.Name(),
+		"--permission-mode", "bypassPermissions",
+	}
+	cmd := exec.CommandContext(ctx, c.claudePath, args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
