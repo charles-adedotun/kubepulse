@@ -206,7 +206,11 @@ func (t *Tracker) calculateBurnRate(metrics []Metric) float64 {
 	}
 
 	// Simple burn rate calculation based on recent trend
-	recent := metrics[len(metrics)-10:]
+	start := len(metrics) - 10
+	if start < 0 {
+		start = 0
+	}
+	recent := metrics[start:]
 	if len(recent) < 2 {
 		return 0.0
 	}

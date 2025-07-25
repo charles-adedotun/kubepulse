@@ -27,7 +27,7 @@ func TestAlertSeverityConstants(t *testing.T) {
 
 func TestAlert(t *testing.T) {
 	now := time.Now()
-	
+
 	alert := Alert{
 		ID:        "alert-123",
 		Name:      "high-cpu-usage",
