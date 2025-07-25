@@ -65,12 +65,12 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 		MaxTurns:   3,
 		Timeout:    120 * time.Second,
 	}
-	
+
 	// Create AI client directly for diagnosis
 	aiClientConfig := ai.Config{
-		ClaudePath:   aiConfig.ClaudePath,
-		MaxTurns:     aiConfig.MaxTurns,
-		Timeout:      aiConfig.Timeout,
+		ClaudePath: aiConfig.ClaudePath,
+		MaxTurns:   aiConfig.MaxTurns,
+		Timeout:    aiConfig.Timeout,
 	}
 	aiClient := ai.NewClient(aiClientConfig)
 

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -100,9 +101,9 @@ type MLConfig struct {
 
 // ServerConfig holds server-related configuration
 type ServerConfig struct {
-	Port         int      `yaml:"port" mapstructure:"port"`
-	Host         string   `yaml:"host" mapstructure:"host"`
-	EnableWeb    bool     `yaml:"enable_web" mapstructure:"enable_web"`
+	Port         int           `yaml:"port" mapstructure:"port"`
+	Host         string        `yaml:"host" mapstructure:"host"`
+	EnableWeb    bool          `yaml:"enable_web" mapstructure:"enable_web"`
 	ReadTimeout  time.Duration `yaml:"read_timeout" mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `yaml:"write_timeout" mapstructure:"write_timeout"`
 }
@@ -230,7 +231,12 @@ func LoadConfig(configPath string) (*Config, error) {
 
 // loadFromFile loads configuration from YAML file
 func loadFromFile(config *Config, path string) error {
-	data, err := os.ReadFile(path)
+	// Validate path to prevent directory traversal
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("invalid config path: path traversal detected")
+	}
+
+	data, err := os.ReadFile(path) // #nosec G304 -- path is validated above
 	if err != nil {
 		return err
 	}
@@ -313,7 +319,7 @@ func SaveConfig(config *Config, path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
 
 // GetDefaultConfig returns a default configuration

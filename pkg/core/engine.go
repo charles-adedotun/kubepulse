@@ -18,41 +18,42 @@ import (
 
 // Engine is the core monitoring engine
 type Engine struct {
-	client        kubernetes.Interface
+	client         kubernetes.Interface
 	currentContext string // Track current context
-	checks        []HealthCheck
-	interval      time.Duration
-	results       map[string]CheckResult
-	resultsMu     sync.RWMutex
-	ctx           context.Context
-	cancel        context.CancelFunc
-	alertChan     chan Alert
-	metricsChan   chan Metric
-	alertManager  *alerts.Manager
-	anomalyEngine *ml.AnomalyDetector
-	sloTracker    *slo.Tracker
-	aiClient      *ai.Client
-	errorHandler  *ErrorHandler
+	checks         []HealthCheck
+	interval       time.Duration
+	results        map[string]CheckResult
+	resultsMu      sync.RWMutex
+	ctx            context.Context
+	cancel         context.CancelFunc
+	alertChan      chan Alert
+	metricsChan    chan Metric
+	alertManager   *alerts.Manager
+	anomalyEngine  *ml.AnomalyDetector
+	sloTracker     *slo.Tracker
+	aiClient       *ai.Client
+	errorHandler   *ErrorHandler
+	resultsTTL     time.Duration // TTL for check results
 
 	// New AI components
 	predictiveAnalyzer *ai.PredictiveAnalyzer
 	assistant          *ai.Assistant
 	remediationEngine  *ai.RemediationEngine
 	smartAlertManager  *ai.SmartAlertManager
-	
+
 	// Enhanced AI system
-	analysisEngine     *ai.AnalysisEngine
+	analysisEngine *ai.AnalysisEngine
 }
 
 // EngineConfig holds configuration for the monitoring engine
 type EngineConfig struct {
-	KubeClient     kubernetes.Interface
-	ContextName    string // Name of the current context
-	Interval       time.Duration
-	AlertChan      chan Alert
-	MetricsChan    chan Metric
-	EnableAI       bool
-	AIConfig       *config.AIConfig
+	KubeClient  kubernetes.Interface
+	ContextName string // Name of the current context
+	Interval    time.Duration
+	AlertChan   chan Alert
+	MetricsChan chan Metric
+	EnableAI    bool
+	AIConfig    *config.AIConfig
 }
 
 // NewEngine creates a new monitoring engine
@@ -83,6 +84,7 @@ func NewEngine(config EngineConfig) *Engine {
 		checks:         make([]HealthCheck, 0),
 		interval:       config.Interval,
 		results:        make(map[string]CheckResult),
+		resultsTTL:     24 * time.Hour, // Keep results for 24 hours
 		ctx:            ctx,
 		cancel:         cancel,
 		alertChan:      config.AlertChan,
@@ -125,13 +127,13 @@ func NewEngine(config EngineConfig) *Engine {
 			kubectlExecutor := ai.NewKubectlExecutor(ai.KubectlExecutorConfig{
 				Database: database,
 			})
-			
+
 			analysisEngineConfig := ai.AnalysisEngineConfig{
 				AIClient: engine.aiClient,
 				Database: database,
 				Executor: kubectlExecutor,
 			}
-			
+
 			engine.analysisEngine = ai.NewAnalysisEngine(analysisEngineConfig)
 			klog.Info("Enhanced AI analysis system initialized")
 		}
@@ -139,12 +141,12 @@ func NewEngine(config EngineConfig) *Engine {
 		// Perform AI health check during initialization
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		healthStatus, err := engine.aiClient.HealthCheck(ctx)
 		if err != nil {
 			klog.Errorf("AI health check failed during initialization: %v", err)
 		} else if healthStatus.Healthy {
-			klog.Infof("AI system health check passed: version=%s, response_time=%v", 
+			klog.Infof("AI system health check passed: version=%s, response_time=%v",
 				healthStatus.Version, healthStatus.ResponseTime)
 		} else {
 			klog.Warningf("AI system unhealthy: %s", healthStatus.Error)
@@ -198,6 +200,26 @@ func (e *Engine) Start() error {
 func (e *Engine) Stop() {
 	klog.Info("Stopping monitoring engine")
 	e.cancel()
+}
+
+// cleanupExpiredResults removes old check results based on TTL
+func (e *Engine) cleanupExpiredResults(ticker <-chan time.Time) {
+	for {
+		select {
+		case <-ticker:
+			e.resultsMu.Lock()
+			now := time.Now()
+			for name, result := range e.results {
+				if now.Sub(result.Timestamp) > e.resultsTTL {
+					delete(e.results, name)
+					klog.V(3).Infof("Cleaned up expired result for check: %s", name)
+				}
+			}
+			e.resultsMu.Unlock()
+		case <-e.ctx.Done():
+			return
+		}
+	}
 }
 
 // runChecks executes all health checks in parallel
@@ -381,9 +403,32 @@ func (e *Engine) GetResult(name string) (CheckResult, bool) {
 
 // UpdateClient updates the Kubernetes client and context
 func (e *Engine) UpdateClient(client kubernetes.Interface, contextName string) {
+	oldContext := e.currentContext
 	e.client = client
 	e.currentContext = contextName
 	klog.Infof("Engine updated with new client for context: %s", contextName)
+
+	// Send alert for context switch if alert channel is available
+	if e.alertChan != nil && oldContext != contextName {
+		alert := Alert{
+			ID:        fmt.Sprintf("context-switch-%d", time.Now().Unix()),
+			Name:      "Context Switch",
+			Severity:  AlertSeverityInfo,
+			Message:   fmt.Sprintf("Kubernetes context switched from %s to %s", oldContext, contextName),
+			Details:   map[string]interface{}{"old_context": oldContext, "new_context": contextName},
+			Source:    "kubepulse",
+			Timestamp: time.Now(),
+			Status:    AlertStatusFiring,
+		}
+
+		select {
+		case e.alertChan <- alert:
+		case <-e.ctx.Done():
+			return
+		default:
+			klog.V(3).Info("Alert channel full, dropping context switch alert")
+		}
+	}
 }
 
 // GetCurrentContext returns the current context name
@@ -473,21 +518,21 @@ func (e *Engine) calculateScore(result CheckResult) float64 {
 func (e *Engine) getWeight(result CheckResult) float64 {
 	// Weight based on check type - critical checks have higher weight
 	weights := map[string]float64{
-		"node-health":    2.0,  // Nodes are critical infrastructure
-		"pod-health":     1.5,  // Pods are important but replaceable
-		"service-health": 1.0,  // Services are important for connectivity
-		"deployment":     1.2,  // Deployments affect availability
-		"statefulset":    1.5,  // StatefulSets are harder to recover
-		"daemonset":      1.3,  // DaemonSets affect all nodes
+		"node-health":    2.0, // Nodes are critical infrastructure
+		"pod-health":     1.5, // Pods are important but replaceable
+		"service-health": 1.0, // Services are important for connectivity
+		"deployment":     1.2, // Deployments affect availability
+		"statefulset":    1.5, // StatefulSets are harder to recover
+		"daemonset":      1.3, // DaemonSets affect all nodes
 	}
-	
+
 	// Check if we have a specific weight for this check type
 	for checkType, weight := range weights {
 		if strings.Contains(strings.ToLower(result.Name), checkType) {
 			return weight
 		}
 	}
-	
+
 	// Default weight
 	return 1.0
 }

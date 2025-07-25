@@ -11,10 +11,10 @@ import (
 
 // AnalysisEngine orchestrates all AI analysis capabilities
 type AnalysisEngine struct {
-	client       *ContextAwareClient
-	database     *Database
-	executor     *KubectlExecutor
-	toolRegistry *ToolRegistry
+	client        *ContextAwareClient
+	database      *Database
+	executor      *KubectlExecutor
+	toolRegistry  *ToolRegistry
 	promptBuilder *PromptBuilder
 }
 
@@ -340,27 +340,27 @@ func (ae *AnalysisEngine) countSuccessfulTools(toolResults map[string]*KubectlTo
 // Response types for the API
 
 type InsightsResponse struct {
-	ClusterName     string          `json:"cluster_name"`
-	OverallHealth   string          `json:"overall_health"`
-	CriticalIssues  []Finding       `json:"critical_issues"`
+	ClusterName     string           `json:"cluster_name"`
+	OverallHealth   string           `json:"overall_health"`
+	CriticalIssues  []Finding        `json:"critical_issues"`
 	Recommendations []Recommendation `json:"recommendations"`
-	Confidence      float64         `json:"confidence"`
-	LastAnalysis    time.Time       `json:"last_analysis"`
-	Trends          []Trend         `json:"trends"`
+	Confidence      float64          `json:"confidence"`
+	LastAnalysis    time.Time        `json:"last_analysis"`
+	Trends          []Trend          `json:"trends"`
 }
 
 type SmartAlertsResponse struct {
-	ClusterName string      `json:"cluster_name"`
+	ClusterName string       `json:"cluster_name"`
 	Alerts      []SmartAlert `json:"alerts"`
-	Timestamp   time.Time   `json:"timestamp"`
-	Confidence  float64     `json:"confidence"`
+	Timestamp   time.Time    `json:"timestamp"`
+	Confidence  float64      `json:"confidence"`
 }
 
 type PredictionsResponse struct {
-	ClusterName string      `json:"cluster_name"`
+	ClusterName string       `json:"cluster_name"`
 	Predictions []Prediction `json:"predictions"`
-	Timestamp   time.Time   `json:"timestamp"`
-	Confidence  float64     `json:"confidence"`
+	Timestamp   time.Time    `json:"timestamp"`
+	Confidence  float64      `json:"confidence"`
 }
 
 // SmartAlert and Prediction types are defined in database_types.go
@@ -380,7 +380,7 @@ func (ae *AnalysisEngine) calculateOverallHealth(result *AnalysisResult) string 
 			criticalCount++
 		}
 	}
-	
+
 	if criticalCount > 0 {
 		return "Critical"
 	}
@@ -407,7 +407,7 @@ func (ae *AnalysisEngine) calculateTrends(clusterName string) []Trend {
 
 func (ae *AnalysisEngine) generateSmartAlerts(toolResults map[string]*KubectlToolResult, patterns []ClusterPattern, history []AnalysisSession) []SmartAlert {
 	alerts := []SmartAlert{}
-	
+
 	// Simple example: check for failed pods
 	if workloadResult, exists := toolResults["workloads"]; exists {
 		if failedPods, exists := workloadResult.Metadata["extracted_metrics"]; exists {
@@ -428,13 +428,13 @@ func (ae *AnalysisEngine) generateSmartAlerts(toolResults map[string]*KubectlToo
 			}
 		}
 	}
-	
+
 	return alerts
 }
 
 func (ae *AnalysisEngine) generatePredictions(toolResults map[string]*KubectlToolResult, history []AnalysisSession) []Prediction {
 	predictions := []Prediction{}
-	
+
 	// Simple example: resource usage prediction
 	if nodeResult, exists := toolResults["nodes"]; exists {
 		if nodeResult.Success {
@@ -449,7 +449,7 @@ func (ae *AnalysisEngine) generatePredictions(toolResults map[string]*KubectlToo
 			})
 		}
 	}
-	
+
 	return predictions
 }
 
@@ -464,7 +464,7 @@ func (ae *AnalysisEngine) calculatePredictionConfidence(predictions []Prediction
 	if len(predictions) == 0 {
 		return 1.0
 	}
-	
+
 	total := 0.0
 	for _, pred := range predictions {
 		total += pred.Likelihood

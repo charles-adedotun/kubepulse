@@ -1,0 +1,280 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubepulse
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubepulse-monitor
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+rules:
+  # Read-only access to nodes
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to pods
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/status"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to services and endpoints
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to deployments, replicasets, statefulsets, daemonsets
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to jobs and cronjobs
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to configmaps and secrets (metadata only)
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  
+  # Read-only access to namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to persistent volumes and claims
+  - apiGroups: [""]
+    resources: ["persistentvolumes", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to storage classes
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to ingresses
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read-only access to RBAC resources
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+    verbs: ["get", "list"]
+  
+  # Read-only access to service accounts
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list"]
+  
+  # Read-only access to CRDs
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list"]
+  
+  # Access to metrics APIs
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+  
+  # Access to API discovery
+  - apiGroups: [""]
+    resources: ["componentstatuses"]
+    verbs: ["get", "list"]
+  
+  # Non-resource URLs
+  - nonResourceURLs: ["/livez", "/readyz", "/metrics", "/api", "/api/*", "/apis", "/apis/*"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubepulse-monitor
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubepulse-monitor
+subjects:
+  - kind: ServiceAccount
+    name: kubepulse
+    namespace: kubepulse-system
+---
+# Optional: Role for remediation actions (requires manual approval to enable)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubepulse-remediation
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: remediation
+  annotations:
+    kubepulse.io/warning: "This role grants write permissions. Enable only after careful review."
+rules:
+  # Scale deployments, replicasets, statefulsets
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "replicasets/scale", "statefulsets/scale"]
+    verbs: ["get", "update", "patch"]
+  
+  # Restart deployments (via rollout)
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "patch"]
+  
+  # Delete pods (for restart)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["delete"]
+    # Note: Should be restricted by additional conditions in admission controllers
+  
+  # Update configmaps and secrets
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "update", "patch"]
+    # Note: Should exclude system namespaces
+---
+# NetworkPolicy to restrict KubePulse network access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubepulse-network-policy
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubepulse
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow traffic from monitoring namespace (Prometheus, etc.)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090  # Metrics port
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow access to Kubernetes API
+    - to:
+        - namespaceSelector: {}
+          podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    # Allow access to Claude API (if using external)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32  # Block metadata service
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# PodSecurityPolicy for KubePulse pods
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: kubepulse-psp
+  labels:
+    app.kubernetes.io/name: kubepulse
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+---
+# Role to use the PodSecurityPolicy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubepulse-psp-user
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+rules:
+  - apiGroups: ['policy']
+    resources: ['podsecuritypolicies']
+    verbs: ['use']
+    resourceNames:
+      - kubepulse-psp
+---
+# RoleBinding for PodSecurityPolicy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubepulse-psp-user
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+roleRef:
+  kind: Role
+  name: kubepulse-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: kubepulse
+    namespace: kubepulse-system

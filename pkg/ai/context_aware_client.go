@@ -12,9 +12,10 @@ import (
 // ContextAwareClient extends the AI client with context-specific data handling
 type ContextAwareClient struct {
 	*Client
-	database        *Database
-	contextManager  *ContextManager
-	sessionHistory  map[string][]AnalysisSession // cluster -> sessions
+	database       *Database
+	contextManager *ContextManager
+	sessionHistory map[string][]AnalysisSession // cluster -> sessions
+	// sessionMutex would protect sessionHistory when accessed concurrently
 }
 
 // ContextManager is defined in context_manager.go
@@ -22,7 +23,7 @@ type ContextAwareClient struct {
 // NewContextAwareClient creates a context-aware AI client
 func NewContextAwareClient(config Config, database *Database) *ContextAwareClient {
 	client := NewClient(config)
-	
+
 	return &ContextAwareClient{
 		Client:         client,
 		database:       database,
@@ -36,7 +37,7 @@ func NewContextAwareClient(config Config, database *Database) *ContextAwareClien
 // AnalyzeWithContext performs AI analysis with context-specific data
 func (c *ContextAwareClient) AnalyzeWithContext(ctx context.Context, request AnalysisRequestV2) (*AnalysisResult, error) {
 	start := time.Now()
-	
+
 	// Get or create cluster context
 	clusterContext, err := c.contextManager.GetContext(request.ClusterName)
 	if err != nil {
@@ -131,9 +132,9 @@ func (c *ContextAwareClient) AnalyzeWithContext(ctx context.Context, request Ana
 	// Update cluster context
 	c.updateClusterContext(clusterContext, result)
 	updates := map[string]interface{}{
-		"confidence": result.Confidence,
+		"confidence":    result.Confidence,
 		"last_analysis": time.Now(),
-		"health_score": clusterContext.HealthScore,
+		"health_score":  clusterContext.HealthScore,
 	}
 	if err := c.contextManager.UpdateContext(clusterContext.ClusterName, updates); err != nil {
 		klog.Errorf("Failed to update cluster context: %v", err)
@@ -227,7 +228,7 @@ func (c *ContextAwareClient) formatBaslineMetrics(metrics map[string]float64) st
 	if len(metrics) == 0 {
 		return "No baseline metrics available"
 	}
-	
+
 	result := ""
 	for key, value := range metrics {
 		result += fmt.Sprintf("- %s: %.2f\n", key, value)
@@ -239,10 +240,10 @@ func (c *ContextAwareClient) formatKnownIssues(issues []Issue) string {
 	if len(issues) == 0 {
 		return "No known issues"
 	}
-	
+
 	result := ""
 	for _, issue := range issues {
-		result += fmt.Sprintf("- [%s] %s: %s (Status: %s)\n", 
+		result += fmt.Sprintf("- [%s] %s: %s (Status: %s)\n",
 			issue.Severity, issue.Type, issue.Description, issue.Status)
 	}
 	return result
@@ -252,7 +253,7 @@ func (c *ContextAwareClient) formatAnalysisHistory(history []AnalysisSession) st
 	if len(history) == 0 {
 		return "No recent analysis history"
 	}
-	
+
 	result := ""
 	for i, session := range history {
 		if i >= 5 { // Limit to last 5 sessions for brevity
@@ -262,7 +263,7 @@ func (c *ContextAwareClient) formatAnalysisHistory(history []AnalysisSession) st
 		if !session.Success {
 			status = fmt.Sprintf("Failed: %s", session.ErrorMessage)
 		}
-		result += fmt.Sprintf("- %s [%s]: %s (Confidence: %.2f)\n", 
+		result += fmt.Sprintf("- %s [%s]: %s (Confidence: %.2f)\n",
 			session.Timestamp.Format("2006-01-02 15:04"), session.AnalysisType, status, session.Confidence)
 	}
 	return result
@@ -272,13 +273,13 @@ func (c *ContextAwareClient) formatPatterns(patterns []ClusterPattern) string {
 	if len(patterns) == 0 {
 		return "No recognized patterns"
 	}
-	
+
 	result := ""
 	for i, pattern := range patterns {
 		if i >= 5 { // Limit to top 5 patterns
 			break
 		}
-		result += fmt.Sprintf("- [%s] %s: %s (Confidence: %.2f, Frequency: %d)\n", 
+		result += fmt.Sprintf("- [%s] %s: %s (Confidence: %.2f, Frequency: %d)\n",
 			pattern.PatternType, pattern.PatternName, pattern.Description, pattern.Confidence, pattern.Frequency)
 	}
 	return result
@@ -288,12 +289,12 @@ func (c *ContextAwareClient) formatKubectlData(data map[string]interface{}) stri
 	if len(data) == 0 {
 		return "No kubectl data provided"
 	}
-	
+
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("Error formatting kubectl data: %v", err)
 	}
-	
+
 	return fmt.Sprintf("```json\n%s\n```", string(jsonData))
 }
 
@@ -312,7 +313,7 @@ func (c *ContextAwareClient) convertToAnalysisResult(requestID, clusterName stri
 			Title:       rec.Title,
 			Description: rec.Description,
 			Category:    rec.Category,
-			Priority:    "medium", // Convert from int priority
+			Priority:    "medium",   // Convert from int priority
 			Commands:    []string{}, // Could extract from actions
 			Impact:      rec.Impact,
 			References:  rec.References,
@@ -320,21 +321,21 @@ func (c *ContextAwareClient) convertToAnalysisResult(requestID, clusterName stri
 	}
 
 	return &AnalysisResult{
-		ID:                requestID,
-		RequestID:         requestID,
-		ClusterName:       clusterName,
-		AnalysisType:      string(response.Type),
-		Summary:           response.Summary,
-		Findings:          findings,
-		Recommendations:   recommendations,
-		KubectlCommands:   []string{}, // Could be extracted from actions
-		Confidence:        response.Confidence,
-		Severity:          response.Severity,
-		ActionRequired:    response.Severity >= SeverityHigh,
-		Timestamp:         time.Now(),
-		Duration:          duration,
-		TokensUsed:        0, // Would need to be tracked
-		CostEstimate:      0, // Would need to be calculated
+		ID:              requestID,
+		RequestID:       requestID,
+		ClusterName:     clusterName,
+		AnalysisType:    string(response.Type),
+		Summary:         response.Summary,
+		Findings:        findings,
+		Recommendations: recommendations,
+		KubectlCommands: []string{}, // Could be extracted from actions
+		Confidence:      response.Confidence,
+		Severity:        response.Severity,
+		ActionRequired:  response.Severity >= SeverityHigh,
+		Timestamp:       time.Now(),
+		Duration:        duration,
+		TokensUsed:      0, // Would need to be tracked
+		CostEstimate:    0, // Would need to be calculated
 	}
 }
 
@@ -342,7 +343,7 @@ func (c *ContextAwareClient) updateClusterContext(context *ClusterContext, resul
 	context.LastAnalysis = time.Now()
 	context.AIConfidence = result.Confidence
 	context.UpdatedAt = time.Now()
-	
+
 	// Update health score based on findings
 	criticalFindings := 0
 	for _, finding := range result.Findings {
@@ -350,7 +351,7 @@ func (c *ContextAwareClient) updateClusterContext(context *ClusterContext, resul
 			criticalFindings++
 		}
 	}
-	
+
 	if criticalFindings > 0 {
 		context.HealthScore = 100.0 - float64(criticalFindings*20) // Reduce by 20 per critical finding
 		if context.HealthScore < 0 {

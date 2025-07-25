@@ -138,7 +138,7 @@ type CheckResult struct {
 	Timestamp   time.Time              `json:"timestamp"`
 	Duration    time.Duration          `json:"duration"`
 	Metrics     []Metric               `json:"metrics,omitempty"`
-	Predictions []HealthPrediction      `json:"predictions,omitempty"`
+	Predictions []HealthPrediction     `json:"predictions,omitempty"`
 }
 
 // Prediction represents an ML prediction

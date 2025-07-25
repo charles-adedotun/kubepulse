@@ -193,7 +193,6 @@ jobs:
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
         configuration-path: .github/labeler.yml
-      continue-on-error: true  # Don't fail if labeler config doesn't exist
     
     - name: Add size labels
       run: |
@@ -224,7 +223,6 @@ jobs:
         echo "PR has $ADDITIONS additions and $DELETIONS deletions (total: $TOTAL lines)"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true  # Don't fail if labels don't exist
 
   summary:
     name: PR Summary
@@ -268,4 +266,3 @@ jobs:
           --body "$COMMENT"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true  # Don't fail the workflow if commenting fails

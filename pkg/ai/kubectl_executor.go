@@ -13,10 +13,10 @@ import (
 
 // KubectlExecutor provides secure kubectl command execution
 type KubectlExecutor struct {
-	kubectlPath    string
-	timeout        time.Duration
+	kubectlPath     string
+	timeout         time.Duration
 	allowedCommands []string
-	database       *Database
+	database        *Database
 }
 
 // KubectlExecutorConfig holds configuration for the kubectl executor
@@ -29,7 +29,14 @@ type KubectlExecutorConfig struct {
 // NewKubectlExecutor creates a new kubectl executor
 func NewKubectlExecutor(config KubectlExecutorConfig) *KubectlExecutor {
 	if config.KubectlPath == "" {
-		config.KubectlPath = "kubectl"
+		// Securely find kubectl binary
+		kubectlPath, err := exec.LookPath("kubectl")
+		if err != nil {
+			klog.Warningf("kubectl not found in PATH: %v, using default", err)
+			config.KubectlPath = "/usr/local/bin/kubectl"
+		} else {
+			config.KubectlPath = kubectlPath
+		}
 	}
 	if config.Timeout == 0 {
 		config.Timeout = 30 * time.Second
@@ -75,7 +82,7 @@ func (e *KubectlExecutor) Execute(ctx context.Context, clusterName, command stri
 	klog.V(3).Infof("Executing kubectl command: %s", command)
 
 	// Execute command with validated arguments
-	cmd := exec.CommandContext(ctx, e.kubectlPath, parts[1:]...)
+	cmd := exec.CommandContext(ctx, e.kubectlPath, parts[1:]...) // #nosec G204 -- arguments are validated above
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -122,11 +129,11 @@ func (e *KubectlExecutor) ExecuteBatch(ctx context.Context, clusterName string, 
 		if err != nil {
 			// Continue with other commands even if one fails
 			execution = &KubectlExecution{
-				ClusterName:   clusterName,
-				Command:       command,
-				Success:       false,
-				ErrorMessage:  err.Error(),
-				Timestamp:     time.Now(),
+				ClusterName:  clusterName,
+				Command:      command,
+				Success:      false,
+				ErrorMessage: err.Error(),
+				Timestamp:    time.Now(),
 			}
 		}
 		results[command] = execution
@@ -166,7 +173,7 @@ func (e *KubectlExecutor) storeExecution(execution *KubectlExecution) error {
 		execution.ExecutionTime.Milliseconds(),
 		execution.AnalysisSessionID,
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to store kubectl execution: %w", err)
 	}
@@ -329,21 +336,4 @@ func (e *KubectlExecutor) GetExecutionHistory(clusterName string, since time.Tim
 	}
 
 	return executions, nil
-}
-
-// containsShellMetacharacters checks if a string contains shell metacharacters
-// that could be used for command injection
-func containsShellMetacharacters(s string) bool {
-	// List of dangerous shell metacharacters
-	dangerousChars := []string{
-		";", "&", "|", "`", "$", "(", ")", "{", "}", "[", "]",
-		"<", ">", "\\", "!", "*", "?", "~", "'", "\"", "\n", "\r",
-	}
-	
-	for _, char := range dangerousChars {
-		if strings.Contains(s, char) {
-			return true
-		}
-	}
-	return false
 }

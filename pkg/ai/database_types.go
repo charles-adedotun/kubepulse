@@ -24,7 +24,7 @@ type ClusterPattern struct {
 	ClusterName string    `json:"cluster_name"`
 	PatternType string    `json:"pattern_type"` // 'anomaly', 'performance', 'failure', 'resource'
 	PatternName string    `json:"pattern_name"`
-	Indicators  string    `json:"indicators"`   // JSON encoded array
+	Indicators  string    `json:"indicators"` // JSON encoded array
 	Description string    `json:"description"`
 	FirstSeen   time.Time `json:"first_seen"`
 	LastSeen    time.Time `json:"last_seen"`
@@ -75,15 +75,15 @@ type KubectlExecution struct {
 
 // ClusterContext represents cached cluster context information
 type ClusterContext struct {
-	ClusterName     string            `json:"cluster_name"`
-	LastAnalysis    time.Time         `json:"last_analysis"`
+	ClusterName     string             `json:"cluster_name"`
+	LastAnalysis    time.Time          `json:"last_analysis"`
 	BaselineMetrics map[string]float64 `json:"baseline_metrics"`
-	KnownIssues     []Issue           `json:"known_issues"`
-	AIConfidence    float64           `json:"ai_confidence"`
-	HealthScore     float64           `json:"health_score"`
-	NodeCount       int               `json:"node_count"`
-	NamespaceCount  int               `json:"namespace_count"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	KnownIssues     []Issue            `json:"known_issues"`
+	AIConfidence    float64            `json:"ai_confidence"`
+	HealthScore     float64            `json:"health_score"`
+	NodeCount       int                `json:"node_count"`
+	NamespaceCount  int                `json:"namespace_count"`
+	UpdatedAt       time.Time          `json:"updated_at"`
 }
 
 // Issue represents a known cluster issue
@@ -109,75 +109,75 @@ type MetricsSummary struct {
 
 // AnalysisRequest represents a request for AI analysis
 type AnalysisRequestV2 struct {
-	ID           string                 `json:"id"`
-	Type         string                 `json:"type"` // 'comprehensive', 'focused', 'diagnostic', 'predictive'
-	ClusterName  string                 `json:"cluster_name"`
-	Context      string                 `json:"context"`
-	KubectlData  map[string]interface{} `json:"kubectl_data"`
-	HistoryData  []AnalysisSession      `json:"history_data,omitempty"`
-	PatternData  []ClusterPattern       `json:"pattern_data,omitempty"`
-	Timestamp    time.Time              `json:"timestamp"`
-	Timeout      time.Duration          `json:"timeout"`
-	Priority     string                 `json:"priority"` // 'low', 'normal', 'high', 'urgent'
+	ID          string                 `json:"id"`
+	Type        string                 `json:"type"` // 'comprehensive', 'focused', 'diagnostic', 'predictive'
+	ClusterName string                 `json:"cluster_name"`
+	Context     string                 `json:"context"`
+	KubectlData map[string]interface{} `json:"kubectl_data"`
+	HistoryData []AnalysisSession      `json:"history_data,omitempty"`
+	PatternData []ClusterPattern       `json:"pattern_data,omitempty"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Timeout     time.Duration          `json:"timeout"`
+	Priority    string                 `json:"priority"` // 'low', 'normal', 'high', 'urgent'
 }
 
 // AnalysisResult represents the result of AI analysis
 type AnalysisResult struct {
-	ID                string               `json:"id"`
-	RequestID         string               `json:"request_id"`
-	ClusterName       string               `json:"cluster_name"`
-	AnalysisType      string               `json:"analysis_type"`
-	Summary           string               `json:"summary"`
-	Findings          []Finding            `json:"findings"`
-	Recommendations   []Recommendation     `json:"recommendations"`
-	KubectlCommands   []string             `json:"kubectl_commands"`
-	Confidence        float64              `json:"confidence"`
-	Severity          SeverityLevel        `json:"severity"`
-	ActionRequired    bool                 `json:"action_required"`
-	FollowUpQuestions []string             `json:"follow_up_questions,omitempty"`
+	ID                string                 `json:"id"`
+	RequestID         string                 `json:"request_id"`
+	ClusterName       string                 `json:"cluster_name"`
+	AnalysisType      string                 `json:"analysis_type"`
+	Summary           string                 `json:"summary"`
+	Findings          []Finding              `json:"findings"`
+	Recommendations   []Recommendation       `json:"recommendations"`
+	KubectlCommands   []string               `json:"kubectl_commands"`
+	Confidence        float64                `json:"confidence"`
+	Severity          SeverityLevel          `json:"severity"`
+	ActionRequired    bool                   `json:"action_required"`
+	FollowUpQuestions []string               `json:"follow_up_questions,omitempty"`
 	Context           map[string]interface{} `json:"context,omitempty"`
-	Timestamp         time.Time            `json:"timestamp"`
-	Duration          time.Duration        `json:"duration"`
-	TokensUsed        int                  `json:"tokens_used"`
-	CostEstimate      float64              `json:"cost_estimate"`
+	Timestamp         time.Time              `json:"timestamp"`
+	Duration          time.Duration          `json:"duration"`
+	TokensUsed        int                    `json:"tokens_used"`
+	CostEstimate      float64                `json:"cost_estimate"`
 }
 
 // Finding represents a specific finding from AI analysis
 type Finding struct {
-	Type        string      `json:"type"`        // 'issue', 'opportunity', 'observation'
-	Category    string      `json:"category"`    // 'performance', 'security', 'reliability'
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
+	Type        string        `json:"type"`     // 'issue', 'opportunity', 'observation'
+	Category    string        `json:"category"` // 'performance', 'security', 'reliability'
+	Title       string        `json:"title"`
+	Description string        `json:"description"`
 	Severity    SeverityLevel `json:"severity"`
-	Evidence    []string    `json:"evidence"`    // kubectl commands/outputs that support this finding
-	Resource    string      `json:"resource,omitempty"`
-	Namespace   string      `json:"namespace,omitempty"`
-	Confidence  float64     `json:"confidence"`
+	Evidence    []string      `json:"evidence"` // kubectl commands/outputs that support this finding
+	Resource    string        `json:"resource,omitempty"`
+	Namespace   string        `json:"namespace,omitempty"`
+	Confidence  float64       `json:"confidence"`
 }
 
 // KubectlToolResult represents the output from a kubectl tool execution
 type KubectlToolResult struct {
-	ToolName        string            `json:"tool_name"`
-	Commands        []string          `json:"commands"`
-	Outputs         map[string]string `json:"outputs"`    // command -> output
-	Errors          map[string]string `json:"errors"`     // command -> error
-	Summary         string            `json:"summary"`
-	ExecutionTime   time.Duration     `json:"execution_time"`
-	Success         bool              `json:"success"`
-	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+	ToolName      string                 `json:"tool_name"`
+	Commands      []string               `json:"commands"`
+	Outputs       map[string]string      `json:"outputs"` // command -> output
+	Errors        map[string]string      `json:"errors"`  // command -> error
+	Summary       string                 `json:"summary"`
+	ExecutionTime time.Duration          `json:"execution_time"`
+	Success       bool                   `json:"success"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Recommendation represents an AI-generated recommendation
 type Recommendation struct {
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Category    string      `json:"category"`    // 'performance', 'security', 'reliability'
-	Priority    string      `json:"priority"`    // 'low', 'medium', 'high', 'critical'
-	Commands    []string    `json:"commands"`    // kubectl commands to execute
-	Impact      string      `json:"impact"`      // expected impact description
-	References  []string    `json:"references"`  // documentation references
-	Confidence  float64     `json:"confidence"`
-	Automated   bool        `json:"automated"`   // can be automated
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Category    string   `json:"category"`   // 'performance', 'security', 'reliability'
+	Priority    string   `json:"priority"`   // 'low', 'medium', 'high', 'critical'
+	Commands    []string `json:"commands"`   // kubectl commands to execute
+	Impact      string   `json:"impact"`     // expected impact description
+	References  []string `json:"references"` // documentation references
+	Confidence  float64  `json:"confidence"`
+	Automated   bool     `json:"automated"` // can be automated
 }
 
 // SeverityLevel represents the severity of findings
@@ -203,11 +203,11 @@ type SmartAlert struct {
 
 // Prediction represents a predictive insight about the cluster
 type Prediction struct {
-	ID          string    `json:"id"`
-	Type        string    `json:"type"`
-	Description string    `json:"description"`
-	Likelihood  float64   `json:"likelihood"`
-	Timeline    string    `json:"timeline"`
-	Impact      string    `json:"impact"`
-	Evidence    []string  `json:"evidence"`
+	ID          string   `json:"id"`
+	Type        string   `json:"type"`
+	Description string   `json:"description"`
+	Likelihood  float64  `json:"likelihood"`
+	Timeline    string   `json:"timeline"`
+	Impact      string   `json:"impact"`
+	Evidence    []string `json:"evidence"`
 }

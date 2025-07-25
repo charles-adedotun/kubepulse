@@ -19,8 +19,15 @@ type RemediationKubectlExecutor struct {
 
 // NewRemediationKubectlExecutor creates a new kubectl executor for remediation
 func NewRemediationKubectlExecutor(namespace string) *RemediationKubectlExecutor {
+	// Securely find kubectl binary
+	kubectlPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		klog.Warningf("kubectl not found in PATH: %v, using default", err)
+		kubectlPath = "/usr/local/bin/kubectl"
+	}
+
 	return &RemediationKubectlExecutor{
-		kubectlPath: "kubectl",
+		kubectlPath: kubectlPath,
 		namespace:   namespace,
 		dryRunMode:  false,
 	}
@@ -37,18 +44,38 @@ func (k *RemediationKubectlExecutor) Execute(ctx context.Context, command string
 		return "", fmt.Errorf("only kubectl commands are supported")
 	}
 
+	// Parse command into parts
+	parts := strings.Fields(command)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid kubectl command format")
+	}
+
+	// Build args slice
+	args := parts[1:] // Skip "kubectl"
+
 	// Add namespace if not present
-	if k.namespace != "" && !strings.Contains(command, "-n ") && !strings.Contains(command, "--namespace") {
-		command = fmt.Sprintf("%s -n %s", command, k.namespace)
+	if k.namespace != "" && !containsArg(args, "-n", "--namespace") {
+		args = append(args, "-n", k.namespace)
+	}
+
+	// Validate arguments for security
+	for _, arg := range args {
+		if containsShellMetacharacters(arg) {
+			return "", fmt.Errorf("invalid characters in command argument: %s", arg)
+		}
+		if strings.Contains(arg, "..") || (strings.HasPrefix(arg, "/") && !strings.HasPrefix(arg, "/dev/")) {
+			return "", fmt.Errorf("path traversal attempt detected in argument: %s", arg)
+		}
 	}
 
 	// Execute with timeout
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	klog.V(2).Infof("Executing: %s", command)
+	klog.V(2).Infof("Executing kubectl with args: %v", args)
 
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	// Use direct command execution without shell
+	cmd := exec.CommandContext(ctx, k.kubectlPath, args...) // #nosec G204 -- arguments are validated above
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -169,4 +196,33 @@ func (s *DefaultSafetyChecker) ValidateCommand(command string) error {
 	}
 
 	return nil
+}
+
+// containsArg checks if an argument slice contains a specific flag
+func containsArg(args []string, flags ...string) bool {
+	for _, arg := range args {
+		for _, flag := range flags {
+			if arg == flag || strings.HasPrefix(arg, flag+"=") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// containsShellMetacharacters checks if a string contains shell metacharacters
+// that could be used for command injection
+func containsShellMetacharacters(s string) bool {
+	// List of dangerous shell metacharacters
+	dangerousChars := []string{
+		";", "&", "|", "`", "$", "(", ")", "{", "}", "[", "]",
+		"<", ">", "\\", "!", "*", "?", "~", "'", "\"", "\n", "\r",
+	}
+
+	for _, char := range dangerousChars {
+		if strings.Contains(s, char) {
+			return true
+		}
+	}
+	return false
 }

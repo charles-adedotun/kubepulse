@@ -86,12 +86,12 @@ func NewServer(config Config) *Server {
 				return true // Allow all origins for simplicity
 			},
 		},
-		clients:      make(map[*websocket.Conn]bool),
-		shutdown:     make(chan struct{}),
-		ctx:          ctx,
-		cancel:       cancel,
-		uiConfig:     config.UIConfig,
-}
+		clients:  make(map[*websocket.Conn]bool),
+		shutdown: make(chan struct{}),
+		ctx:      ctx,
+		cancel:   cancel,
+		uiConfig: config.UIConfig,
+	}
 
 	server.setupRoutes()
 
@@ -141,7 +141,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/ai/insights", s.handleAIInsights).Methods("GET")
 	api.HandleFunc("/ai/analyze/{check}", s.handleAIAnalyze).Methods("POST")
 	api.HandleFunc("/ai/heal/{check}", s.handleAIHeal).Methods("POST")
-	
+
 	// Register new AI routes on the api subrouter
 	aiApi := api.PathPrefix("/ai").Subrouter()
 	// Assistant endpoints
@@ -155,7 +155,7 @@ func (s *Server) setupRoutes() {
 	aiApi.HandleFunc("/alerts/insights", s.HandleSmartAlerts).Methods("GET")
 	// AI Insights for frontend
 	aiApi.HandleFunc("/insights", s.HandleAIInsights).Methods("GET")
-	
+
 	// Enhanced AI system endpoints
 	aiApi.HandleFunc("/analysis/comprehensive", s.HandleComprehensiveAnalysis).Methods("GET")
 	aiApi.HandleFunc("/analysis/diagnostic", s.HandleDiagnosticAnalysis).Methods("POST")
@@ -205,7 +205,7 @@ func (s *Server) handleClusterHealth(w http.ResponseWriter, r *http.Request) {
 			klog.V(3).Infof("Could not get current context: %v", err)
 		}
 	}
-	
+
 	clusterName := r.URL.Query().Get("cluster")
 	if clusterName == "" {
 		clusterName = contextName
@@ -239,13 +239,13 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	// Get alerts from the engine's alert manager
 	var alerts []map[string]interface{}
-	
+
 	// For now, return empty array if no alerts
 	// This will be populated by the alert manager in production
 	if alerts == nil {
 		alerts = []map[string]interface{}{}
 	}
-	
+
 	s.writeJSON(w, alerts)
 }
 
@@ -281,7 +281,6 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 // Old WebSocket handler removed - replaced with improved version with proper cleanup
 
-
 // AI insights cache to prevent too frequent calls
 type AIInsightsCache struct {
 	insights   interface{}
@@ -306,31 +305,31 @@ func (s *Server) handleAIInsights(w http.ResponseWriter, r *http.Request) {
 
 	// Return the latest available insights with information about the new approach
 	response := map[string]interface{}{
-		"status": "scheduled_available",
+		"status":    "scheduled_available",
 		"timestamp": time.Now().Format(time.RFC3339),
-		"approach": "event_and_schedule_driven",
-		"summary": "AI insights are now generated on-demand based on cluster events and scheduled analysis",
+		"approach":  "event_and_schedule_driven",
+		"summary":   "AI insights are now generated on-demand based on cluster events and scheduled analysis",
 		"insights": []map[string]interface{}{
 			{
-				"type": "scheduler_info",
-				"title": "Intelligent AI Analysis Active",
-				"message": "KubePulse now uses event-driven AI analysis triggered by cluster changes, failures, and scheduled health checks.",
+				"type":       "scheduler_info",
+				"title":      "Intelligent AI Analysis Active",
+				"message":    "KubePulse now uses event-driven AI analysis triggered by cluster changes, failures, and scheduled health checks.",
 				"confidence": 1.0,
-				"trend": "optimized",
+				"trend":      "optimized",
 			},
 			{
-				"type": "performance",
-				"title": "Cluster Performance Optimal",
-				"message": "CPU and memory utilization are within optimal ranges. AI analysis will trigger automatically if issues arise.",
+				"type":       "performance",
+				"title":      "Cluster Performance Optimal",
+				"message":    "CPU and memory utilization are within optimal ranges. AI analysis will trigger automatically if issues arise.",
 				"confidence": 0.92,
-				"trend": "stable",
+				"trend":      "stable",
 			},
 		},
 		"schedule_info": map[string]interface{}{
-			"daily_analysis": "02:00 AM",
+			"daily_analysis":    "02:00 AM",
 			"periodic_analysis": "Every 3 hours",
-			"event_driven": "Automatic on failures/anomalies",
-			"max_daily_calls": 8,
+			"event_driven":      "Automatic on failures/anomalies",
+			"max_daily_calls":   8,
 		},
 		"recommendations": []string{
 			"AI analysis is now optimized for efficiency",
@@ -338,7 +337,7 @@ func (s *Server) handleAIInsights(w http.ResponseWriter, r *http.Request) {
 			"Check the AI Scheduler status for more details",
 		},
 	}
-	
+
 	// Cache this response
 	aiInsightsCache.mutex.Lock()
 	aiInsightsCache.insights = response
@@ -553,7 +552,7 @@ func (s *Server) cleanupClients() {
 					continue
 				default:
 				}
-				
+
 				_ = conn.SetWriteDeadline(time.Now().Add(time.Second))
 				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 					deadConnections = append(deadConnections, conn)
@@ -683,7 +682,7 @@ func (s *Server) handleSwitchContext(w http.ResponseWriter, r *http.Request) {
 	if s.engine != nil {
 		s.engine.UpdateClient(newClient, req.ContextName)
 	}
-	
+
 	// Get updated context info
 	context, err := s.contextManager.GetCurrentContext()
 	if err != nil {
@@ -705,7 +704,7 @@ func (s *Server) handleSwitchContext(w http.ResponseWriter, r *http.Request) {
 
 // ConnectionStatus represents the connection status details
 type ConnectionStatus struct {
-	Status      string            `json:"status"`      // connected, disconnected, no_contexts, invalid_context
+	Status      string            `json:"status"` // connected, disconnected, no_contexts, invalid_context
 	HasContexts bool              `json:"has_contexts"`
 	Current     *k8s.ContextInfo  `json:"current"`
 	Error       *string           `json:"error,omitempty"`
@@ -803,10 +802,10 @@ func (s *Server) handleContextStatus(w http.ResponseWriter, r *http.Request) {
 				"Try switching to another context",
 			},
 			Details: map[string]string{
-				"context_name":  currentContext.Name,
-				"cluster_name":  currentContext.ClusterName,
-				"server":        currentContext.Server,
-				"namespace":     currentContext.Namespace,
+				"context_name": currentContext.Name,
+				"cluster_name": currentContext.ClusterName,
+				"server":       currentContext.Server,
+				"namespace":    currentContext.Namespace,
 			},
 		}
 		s.writeJSON(w, status)
@@ -831,10 +830,10 @@ func (s *Server) handleContextStatus(w http.ResponseWriter, r *http.Request) {
 				"Verify authentication tokens are valid",
 			},
 			Details: map[string]string{
-				"context_name":  currentContext.Name,
-				"cluster_name":  currentContext.ClusterName,
-				"server":        currentContext.Server,
-				"namespace":     currentContext.Namespace,
+				"context_name": currentContext.Name,
+				"cluster_name": currentContext.ClusterName,
+				"server":       currentContext.Server,
+				"namespace":    currentContext.Namespace,
 			},
 		}
 		s.writeJSON(w, status)
@@ -849,10 +848,10 @@ func (s *Server) handleContextStatus(w http.ResponseWriter, r *http.Request) {
 		Message:     fmt.Sprintf("Successfully connected to cluster '%s'", currentContext.ClusterName),
 		CanRetry:    false,
 		Details: map[string]string{
-			"context_name":  currentContext.Name,
-			"cluster_name":  currentContext.ClusterName,
-			"server":        currentContext.Server,
-			"namespace":     currentContext.Namespace,
+			"context_name": currentContext.Name,
+			"cluster_name": currentContext.ClusterName,
+			"server":       currentContext.Server,
+			"namespace":    currentContext.Namespace,
 		},
 	}
 	s.writeJSON(w, status)
@@ -863,55 +862,55 @@ func (s *Server) handleAISchedulerStatus(w http.ResponseWriter, r *http.Request)
 	// For now, return mock scheduler status since we haven't fully integrated it yet
 	// In the next step, this would call the actual scheduler.GetScheduleStatus()
 	status := map[string]interface{}{
-		"enabled": true,
-		"approach": "event_and_schedule_driven",
-		"daily_analysis": "02:00 AM",
+		"enabled":           true,
+		"approach":          "event_and_schedule_driven",
+		"daily_analysis":    "02:00 AM",
 		"periodic_interval": "3h0m0s",
-		"max_daily_calls": 8,
+		"max_daily_calls":   8,
 		"current_usage": map[string]interface{}{
-			"daily_calls_used": 2,
+			"daily_calls_used":      2,
 			"daily_calls_remaining": 6,
-			"last_analysis": "2025-07-23T21:00:00Z",
-			"next_scheduled": "2025-07-24T02:00:00Z",
+			"last_analysis":         "2025-07-23T21:00:00Z",
+			"next_scheduled":        "2025-07-24T02:00:00Z",
 		},
 		"event_triggers": map[string]interface{}{
 			"failure_threshold": 3,
 			"anomaly_threshold": 0.7,
-			"min_interval": "15m0s",
+			"min_interval":      "15m0s",
 		},
 		"optimization": map[string]interface{}{
-			"estimated_savings": "85% fewer AI calls vs polling",
+			"estimated_savings":       "85% fewer AI calls vs polling",
 			"previous_calls_per_hour": 120,
-			"new_calls_per_hour": 18,
-			"efficiency_gain": "85%",
+			"new_calls_per_hour":      18,
+			"efficiency_gain":         "85%",
 		},
 		"recent_events": []map[string]interface{}{
 			{
-				"type": "scheduled_analysis",
+				"type":      "scheduled_analysis",
 				"timestamp": "2025-07-23T21:00:00Z",
-				"trigger": "3-hour periodic check",
-				"duration": "2.3s",
+				"trigger":   "3-hour periodic check",
+				"duration":  "2.3s",
 			},
 		},
 	}
-	
+
 	s.writeJSON(w, status)
 }
 
 // handleAISchedulerTrigger allows manual triggering of AI analysis for testing
 func (s *Server) handleAISchedulerTrigger(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		EventType   string            `json:"event_type"`
-		Severity    string            `json:"severity"`
-		Description string            `json:"description"`
+		EventType   string                 `json:"event_type"`
+		Severity    string                 `json:"severity"`
+		Description string                 `json:"description"`
 		Metadata    map[string]interface{} `json:"metadata"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	
+
 	if req.EventType == "" {
 		req.EventType = "manual_trigger"
 	}
@@ -921,11 +920,11 @@ func (s *Server) handleAISchedulerTrigger(w http.ResponseWriter, r *http.Request
 	if req.Description == "" {
 		req.Description = "Manually triggered AI analysis"
 	}
-	
+
 	// In the next step, this would call scheduler.TriggerEvent()
 	// For now, return a mock response
 	response := map[string]interface{}{
-		"status": "triggered",
+		"status":  "triggered",
 		"message": "AI analysis triggered successfully",
 		"event": map[string]interface{}{
 			"type":        req.EventType,
@@ -934,9 +933,9 @@ func (s *Server) handleAISchedulerTrigger(w http.ResponseWriter, r *http.Request
 			"timestamp":   time.Now().Format(time.RFC3339),
 		},
 		"estimated_completion": time.Now().Add(30 * time.Second).Format(time.RFC3339),
-		"note": "Results will be pushed via WebSocket when ready",
+		"note":                 "Results will be pushed via WebSocket when ready",
 	}
-	
+
 	klog.Infof("Manual AI analysis triggered: %s (%s)", req.EventType, req.Severity)
 	s.writeJSON(w, response)
 }

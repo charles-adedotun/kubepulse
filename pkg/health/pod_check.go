@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -172,7 +173,12 @@ func (p *PodHealthCheck) Configure(config map[string]interface{}) error {
 		p.namespace = v
 	}
 	if v, ok := config["restart_threshold"].(int); ok {
-		p.restartThreshold = int32(v)
+		// Ensure value is within int32 range
+		if v >= math.MinInt32 && v <= math.MaxInt32 {
+			p.restartThreshold = int32(v)
+		} else {
+			return fmt.Errorf("restart_threshold %d is out of int32 range", v)
+		}
 	}
 	if v, ok := config["exclude_namespaces"].([]string); ok {
 		p.excludeNamespaces = v

@@ -1,0 +1,322 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubepulse-config
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+    kubernetes:
+      inCluster: true
+      namespace: ""  # Monitor all namespaces
+      contextTimeout: 10s
+    
+    monitoring:
+      interval: 30s
+      healthCheckTimeout: 30s
+      enabledChecks:
+        - nodes
+        - pods
+        - services
+        - deployments
+        - statefulsets
+        - daemonsets
+        - persistentvolumes
+        - events
+    
+    alerts:
+      enabled: true
+      channels:
+        - type: log
+          level: warning
+    
+    slo:
+      targets:
+        uptime: 99.9
+        responseTime: 1000  # ms
+    
+    ai:
+      enabled: true
+      claudePath: "/usr/local/bin/claude"
+      maxTurns: 3
+      timeout: 120s
+      databasePath: "/data/kubepulse.db"
+      enablePredictive: true
+      enableRemediation: false  # Disabled by default for safety
+    
+    server:
+      address: "0.0.0.0:8080"
+      metricsAddress: "0.0.0.0:9090"
+      readTimeout: 15s
+      writeTimeout: 15s
+      enableCORS: true
+      corsOrigins:
+        - "http://localhost:3000"
+        - "https://kubepulse.local"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kubepulse-data
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard  # Adjust based on your cluster
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubepulse
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 1  # Single replica due to local database
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubepulse
+      app.kubernetes.io/component: monitor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubepulse
+        app.kubernetes.io/component: monitor
+        app.kubernetes.io/version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: kubepulse
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kubepulse
+          image: kubepulse/kubepulse:latest  # Replace with your image
+          imagePullPolicy: IfNotPresent
+          command: ["/app/kubepulse"]
+          args: ["serve", "--config", "/config/config.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: KUBEPULSE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KUBEPULSE_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLAUDE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kubepulse-secrets
+                  key: claude-api-key
+                  optional: true
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /.cache
+      volumes:
+        - name: config
+          configMap:
+            name: kubepulse-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: kubepulse-data
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubepulse
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubepulse-nodeport
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # For AWS
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+      nodePort: 30080  # Adjust as needed
+  selector:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+---
+# Optional: Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubepulse
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # If using cert-manager
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - kubepulse.example.com  # Replace with your domain
+      secretName: kubepulse-tls
+  rules:
+    - host: kubepulse.example.com  # Replace with your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kubepulse
+                port:
+                  name: http
+---
+# HorizontalPodAutoscaler (optional - requires metrics-server)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kubepulse
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubepulse
+  minReplicas: 1
+  maxReplicas: 1  # Keep at 1 due to local database
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kubepulse
+  namespace: kubepulse-system
+  labels:
+    app.kubernetes.io/name: kubepulse
+    app.kubernetes.io/component: monitor
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubepulse
+      app.kubernetes.io/component: monitor

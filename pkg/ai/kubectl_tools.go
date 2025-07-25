@@ -64,7 +64,7 @@ func (c *ControlPlaneAnalyzer) GetCommands() []string {
 func (c *ControlPlaneAnalyzer) RequiredPermissions() []string {
 	return []string{
 		"get /livez",
-		"get /readyz", 
+		"get /readyz",
 		"get componentstatuses",
 		"get /metrics",
 		"cluster-info",
@@ -73,7 +73,7 @@ func (c *ControlPlaneAnalyzer) RequiredPermissions() []string {
 
 func (c *ControlPlaneAnalyzer) Execute(ctx context.Context, clusterName string) (*KubectlToolResult, error) {
 	start := time.Now()
-	
+
 	klog.V(2).Infof("Executing control plane analysis for cluster: %s", clusterName)
 
 	commands := c.GetCommands()
@@ -122,7 +122,7 @@ func (c *ControlPlaneAnalyzer) Execute(ctx context.Context, clusterName string) 
 // generateSummary creates a human-readable summary of control plane health
 func (c *ControlPlaneAnalyzer) generateSummary(outputs, errors map[string]string) string {
 	var summary strings.Builder
-	
+
 	summary.WriteString("Control Plane Health Analysis:\n")
 
 	// Check API server liveness
@@ -245,14 +245,14 @@ func (n *NodeAnalyzer) GetCommands() []string {
 func (n *NodeAnalyzer) RequiredPermissions() []string {
 	return []string{
 		"get nodes",
-		"list nodes", 
+		"list nodes",
 		"describe nodes",
 	}
 }
 
 func (n *NodeAnalyzer) Execute(ctx context.Context, clusterName string) (*KubectlToolResult, error) {
 	start := time.Now()
-	
+
 	klog.V(2).Infof("Executing node analysis for cluster: %s", clusterName)
 
 	commands := n.GetCommands()
@@ -300,7 +300,7 @@ func (n *NodeAnalyzer) Execute(ctx context.Context, clusterName string) (*Kubect
 
 func (n *NodeAnalyzer) generateSummary(outputs, errors map[string]string) string {
 	var summary strings.Builder
-	
+
 	summary.WriteString("Node Health Analysis:\n")
 
 	// Analyze node list
@@ -311,7 +311,7 @@ func (n *NodeAnalyzer) generateSummary(outputs, errors map[string]string) string
 			readyCount := strings.Count(nodes, " Ready ")
 			summary.WriteString(fmt.Sprintf("✓ Total nodes: %d\n", nodeCount))
 			summary.WriteString(fmt.Sprintf("✓ Ready nodes: %d\n", readyCount))
-			
+
 			if notReadyCount := strings.Count(nodes, " NotReady "); notReadyCount > 0 {
 				summary.WriteString(fmt.Sprintf("✗ NotReady nodes: %d\n", notReadyCount))
 			}
@@ -402,7 +402,7 @@ func (w *WorkloadAnalyzer) GetCommands() []string {
 	return []string{
 		"kubectl get pods -A -o wide",
 		"kubectl get deployments -A",
-		"kubectl get replicasets -A", 
+		"kubectl get replicasets -A",
 		"kubectl get services -A",
 		"kubectl get events -A --sort-by=.lastTimestamp | tail -20",
 		"kubectl top pods -A --sort-by=cpu | head -20",
@@ -415,7 +415,7 @@ func (w *WorkloadAnalyzer) RequiredPermissions() []string {
 		"get pods",
 		"list pods",
 		"get deployments",
-		"list deployments", 
+		"list deployments",
 		"get replicasets",
 		"list replicasets",
 		"get services",
@@ -427,7 +427,7 @@ func (w *WorkloadAnalyzer) RequiredPermissions() []string {
 
 func (w *WorkloadAnalyzer) Execute(ctx context.Context, clusterName string) (*KubectlToolResult, error) {
 	start := time.Now()
-	
+
 	klog.V(2).Infof("Executing workload analysis for cluster: %s", clusterName)
 
 	commands := w.GetCommands()
@@ -455,8 +455,8 @@ func (w *WorkloadAnalyzer) Execute(ctx context.Context, clusterName string) (*Ku
 		} else {
 			result.Errors[cmd] = execution.ErrorMessage
 			// Don't fail overall if only metrics-server commands fail
-			if !strings.Contains(execution.ErrorMessage, "metrics-server") && 
-			   !strings.Contains(cmd, "top pods") {
+			if !strings.Contains(execution.ErrorMessage, "metrics-server") &&
+				!strings.Contains(cmd, "top pods") {
 				result.Success = false
 			}
 		}
@@ -476,7 +476,7 @@ func (w *WorkloadAnalyzer) Execute(ctx context.Context, clusterName string) (*Ku
 
 func (w *WorkloadAnalyzer) generateSummary(outputs, errors map[string]string) string {
 	var summary strings.Builder
-	
+
 	summary.WriteString("Workload Health Analysis:\n")
 
 	// Analyze pods
@@ -487,7 +487,7 @@ func (w *WorkloadAnalyzer) generateSummary(outputs, errors map[string]string) st
 			runningCount := strings.Count(pods, " Running ")
 			summary.WriteString(fmt.Sprintf("✓ Total pods: %d\n", podCount))
 			summary.WriteString(fmt.Sprintf("✓ Running pods: %d\n", runningCount))
-			
+
 			// Check for problematic pods
 			if problemPods, ok := outputs["kubectl get pods -A --field-selector status.phase!=Running"]; ok {
 				problemLines := strings.Split(problemPods, "\n")
@@ -650,9 +650,9 @@ func (r *ToolRegistry) ExecuteAll(ctx context.Context, clusterName string) (map[
 			klog.Errorf("Tool %s failed: %v", name, err)
 			// Continue with other tools
 			results[name] = &KubectlToolResult{
-				ToolName:    name,
-				Success:     false,
-				Errors:      map[string]string{"execution": err.Error()},
+				ToolName:      name,
+				Success:       false,
+				Errors:        map[string]string{"execution": err.Error()},
 				ExecutionTime: 0,
 			}
 		} else {
@@ -666,7 +666,7 @@ func (r *ToolRegistry) ExecuteAll(ctx context.Context, clusterName string) (map[
 // GetToolsManifest returns information about all tools
 func (r *ToolRegistry) GetToolsManifest() map[string]interface{} {
 	manifest := make(map[string]interface{})
-	
+
 	for name, tool := range r.tools {
 		manifest[name] = map[string]interface{}{
 			"name":        tool.Name(),

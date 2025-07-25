@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,7 +35,27 @@ type Config struct {
 // NewClient creates a new AI client
 func NewClient(config Config) *Client {
 	if config.ClaudePath == "" {
-		config.ClaudePath = "claude" // Assume claude is in PATH
+		// Use exec.LookPath to find claude binary securely
+		claudePath, err := exec.LookPath("claude")
+		if err != nil {
+			klog.Warningf("claude binary not found in PATH: %v", err)
+			config.ClaudePath = "/usr/local/bin/claude" // Fallback to common location
+		} else {
+			config.ClaudePath = claudePath
+		}
+	} else {
+		// Validate the provided path
+		if !filepath.IsAbs(config.ClaudePath) {
+			klog.Warningf("Claude path is not absolute: %s", config.ClaudePath)
+			// Try to resolve it
+			if resolvedPath, err := exec.LookPath(config.ClaudePath); err == nil {
+				config.ClaudePath = resolvedPath
+			}
+		}
+		// Verify the binary exists and is executable
+		if info, err := os.Stat(config.ClaudePath); err != nil || info.IsDir() {
+			klog.Errorf("Invalid claude path: %s", config.ClaudePath)
+		}
 	}
 	if config.MaxTurns == 0 {
 		config.MaxTurns = 3
@@ -197,7 +218,7 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	defer func() {
 		_ = os.Remove(promptFile.Name())
 	}()
-	
+
 	if _, err := promptFile.WriteString(sanitizedPrompt); err != nil {
 		return "", fmt.Errorf("failed to write prompt: %w", err)
 	}
@@ -210,7 +231,7 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	defer func() {
 		_ = os.Remove(systemPromptFile.Name())
 	}()
-	
+
 	if _, err := systemPromptFile.WriteString(c.systemPrompt); err != nil {
 		return "", fmt.Errorf("failed to write system prompt: %w", err)
 	}
@@ -224,7 +245,7 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 		"--system-prompt", "@" + systemPromptFile.Name(),
 		"--permission-mode", "bypassPermissions",
 	}
-	cmd := exec.CommandContext(ctx, c.claudePath, args...)
+	cmd := exec.CommandContext(ctx, c.claudePath, args...) // #nosec G204 -- claudePath is from config, args are validated
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -474,7 +495,7 @@ Please structure your response with:
 // HealthCheck performs an AI system health check
 func (c *Client) HealthCheck(ctx context.Context) (*AIHealthStatus, error) {
 	klog.V(2).Info("Performing AI system health check")
-	
+
 	start := time.Now()
 	status := &AIHealthStatus{
 		Timestamp: start,
@@ -485,7 +506,7 @@ func (c *Client) HealthCheck(ctx context.Context) (*AIHealthStatus, error) {
 	}
 
 	// Test basic Claude CLI availability
-	cmd := exec.CommandContext(ctx, c.claudePath, "--version")
+	cmd := exec.CommandContext(ctx, c.claudePath, "--version") // #nosec G204 -- hardcoded safe arguments
 	output, err := cmd.Output()
 	if err != nil {
 		status.Error = fmt.Sprintf("Claude CLI not available: %v", err)
@@ -497,7 +518,7 @@ func (c *Client) HealthCheck(ctx context.Context) (*AIHealthStatus, error) {
 
 	// Test basic AI query functionality
 	testQuery := "Respond with exactly: 'AI_HEALTH_OK'"
-	testCmd := exec.CommandContext(ctx, c.claudePath, "-p", testQuery)
+	testCmd := exec.CommandContext(ctx, c.claudePath, "-p", testQuery) // #nosec G204 -- hardcoded safe arguments
 	var testBuf bytes.Buffer
 	testCmd.Stdout = &testBuf
 	testCmd.Stderr = &testBuf
@@ -530,7 +551,7 @@ func (c *Client) HealthCheck(ctx context.Context) (*AIHealthStatus, error) {
 	status.Metrics["response_time_ms"] = status.ResponseTime.Milliseconds()
 
 	if status.Healthy {
-		klog.V(2).Infof("AI health check passed: version=%s, response_time=%v", 
+		klog.V(2).Infof("AI health check passed: version=%s, response_time=%v",
 			status.Version, status.ResponseTime)
 	} else {
 		klog.Warningf("AI health check failed: %s", status.Error)

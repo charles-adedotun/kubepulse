@@ -121,7 +121,7 @@ func (c *ContextManager) AddKnownIssue(clusterName string, issue Issue) error {
 			ctx.KnownIssues[i].LastSeen = issue.LastSeen
 			ctx.KnownIssues[i].Description = issue.Description
 			ctx.KnownIssues[i].Status = issue.Status
-			
+
 			return c.saveToDatabase(ctx)
 		}
 	}
@@ -258,7 +258,7 @@ func (c *ContextManager) CleanupOldData(ctx context.Context, maxAge time.Duratio
 	for rows.Next() {
 		var clusterName string
 		var knownIssuesJSON string
-		
+
 		if err := rows.Scan(&clusterName, &knownIssuesJSON); err != nil {
 			klog.Errorf("Failed to scan cluster context: %v", err)
 			continue
@@ -289,7 +289,7 @@ func (c *ContextManager) CleanupOldData(ctx context.Context, maxAge time.Duratio
 				continue
 			}
 
-			_, err = c.database.DB().ExecContext(ctx, 
+			_, err = c.database.DB().ExecContext(ctx,
 				"UPDATE cluster_contexts SET known_issues = ? WHERE cluster_name = ?",
 				string(updatedJSON), clusterName)
 			if err != nil {
@@ -310,7 +310,7 @@ func (c *ContextManager) CleanupOldData(ctx context.Context, maxAge time.Duratio
 // ListClusters returns all clusters with contexts
 func (c *ContextManager) ListClusters() ([]string, error) {
 	query := "SELECT DISTINCT cluster_name FROM cluster_contexts ORDER BY cluster_name"
-	
+
 	rows, err := c.database.DB().Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clusters: %w", err)

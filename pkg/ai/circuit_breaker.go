@@ -95,7 +95,7 @@ func (cb *CircuitBreaker) canExecute() bool {
 	case CircuitOpen:
 		// Calculate exponential backoff timeout
 		backoffTimeout := cb.calculateBackoffTimeout()
-		
+
 		// Check if backoff timeout has passed
 		if time.Since(cb.lastFailTime) > backoffTimeout {
 			cb.setState(CircuitHalfOpen)
@@ -117,16 +117,16 @@ func (cb *CircuitBreaker) calculateBackoffTimeout() time.Duration {
 	if attempts > 10 {
 		attempts = 10
 	}
-	
+
 	multiplier := 1 << attempts // 2^attempts
 	timeout := cb.baseTimeout * time.Duration(multiplier)
-	
+
 	// Cap maximum timeout at 30 minutes
 	maxTimeout := 30 * time.Minute
 	if timeout > maxTimeout {
 		timeout = maxTimeout
 	}
-	
+
 	return timeout
 }
 

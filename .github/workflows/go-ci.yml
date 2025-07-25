@@ -133,7 +133,6 @@ jobs:
       run: |
         go install golang.org/x/vuln/cmd/govulncheck@latest
         govulncheck ./...
-      continue-on-error: true  # Don't fail build on vulnerabilities, just report
 
   compatibility:
     name: Cross-Platform Compatibility

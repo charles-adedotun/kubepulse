@@ -1,9 +1,11 @@
 package k8s
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -12,9 +14,9 @@ import (
 // Helper function to create test kubeconfig
 func createTestKubeconfig(t *testing.T) string {
 	t.Helper()
-	
+
 	config := clientcmdapi.NewConfig()
-	
+
 	// Add test clusters
 	config.Clusters["test-cluster-1"] = &clientcmdapi.Cluster{
 		Server: "https://test-cluster-1.example.com",
@@ -22,7 +24,7 @@ func createTestKubeconfig(t *testing.T) string {
 	config.Clusters["test-cluster-2"] = &clientcmdapi.Cluster{
 		Server: "https://test-cluster-2.example.com",
 	}
-	
+
 	// Add test auth infos
 	config.AuthInfos["test-user-1"] = &clientcmdapi.AuthInfo{
 		Token: "test-token-1",
@@ -30,7 +32,7 @@ func createTestKubeconfig(t *testing.T) string {
 	config.AuthInfos["test-user-2"] = &clientcmdapi.AuthInfo{
 		Token: "test-token-2",
 	}
-	
+
 	// Add test contexts
 	config.Contexts["context-1"] = &clientcmdapi.Context{
 		Cluster:   "test-cluster-1",
@@ -42,27 +44,27 @@ func createTestKubeconfig(t *testing.T) string {
 		AuthInfo:  "test-user-2",
 		Namespace: "kube-system",
 	}
-	
+
 	// Set current context
 	config.CurrentContext = "context-1"
-	
+
 	// Write to temp file
 	tmpFile, err := os.CreateTemp("", "kubeconfig-*.yaml")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	
+
 	if err := clientcmd.WriteToFile(*config, tmpFile.Name()); err != nil {
 		t.Fatalf("Failed to write kubeconfig: %v", err)
 	}
-	
+
 	return tmpFile.Name()
 }
 
 func TestNewContextManager(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	tests := []struct {
 		name           string
 		kubeconfigPath string
@@ -86,11 +88,11 @@ func TestNewContextManager(t *testing.T) {
 			wantErr:        false, // May succeed if default kubeconfig exists
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cm, err := NewContextManager(tt.kubeconfigPath)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -112,27 +114,27 @@ func TestNewContextManager(t *testing.T) {
 func TestListContexts(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to create context manager: %v", err)
 	}
-	
+
 	contexts, err := cm.ListContexts()
 	if err != nil {
 		t.Fatalf("Failed to list contexts: %v", err)
 	}
-	
+
 	if len(contexts) != 2 {
 		t.Errorf("Expected 2 contexts, got %d", len(contexts))
 	}
-	
+
 	// Verify context details
 	contextMap := make(map[string]ContextInfo)
 	for _, ctx := range contexts {
 		contextMap[ctx.Name] = ctx
 	}
-	
+
 	// Check context-1
 	if ctx1, ok := contextMap["context-1"]; !ok {
 		t.Error("context-1 not found")
@@ -150,7 +152,7 @@ func TestListContexts(t *testing.T) {
 			t.Errorf("Expected server https://test-cluster-1.example.com, got %s", ctx1.Server)
 		}
 	}
-	
+
 	// Check context-2
 	if ctx2, ok := contextMap["context-2"]; !ok {
 		t.Error("context-2 not found")
@@ -167,17 +169,17 @@ func TestListContexts(t *testing.T) {
 func TestGetCurrentContext(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to create context manager: %v", err)
 	}
-	
+
 	currentCtx, err := cm.GetCurrentContext()
 	if err != nil {
 		t.Fatalf("Failed to get current context: %v", err)
 	}
-	
+
 	if currentCtx.Name != "context-1" {
 		t.Errorf("Expected current context context-1, got %s", currentCtx.Name)
 	}
@@ -189,37 +191,37 @@ func TestGetCurrentContext(t *testing.T) {
 func TestSwitchContext(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to create context manager: %v", err)
 	}
-	
+
 	// Initial context should be context-1
 	if cm.currentContext != "context-1" {
 		t.Errorf("Expected initial context context-1, got %s", cm.currentContext)
 	}
-	
+
 	// Switch to context-2
 	err = cm.SwitchContext("context-2")
 	if err != nil {
 		t.Fatalf("Failed to switch context: %v", err)
 	}
-	
+
 	if cm.currentContext != "context-2" {
 		t.Errorf("Expected current context context-2, got %s", cm.currentContext)
 	}
-	
+
 	// Verify through GetCurrentContext
 	currentCtx, err := cm.GetCurrentContext()
 	if err != nil {
 		t.Fatalf("Failed to get current context: %v", err)
 	}
-	
+
 	if currentCtx.Name != "context-2" {
 		t.Errorf("Expected current context context-2, got %s", currentCtx.Name)
 	}
-	
+
 	// Try switching to non-existent context
 	err = cm.SwitchContext("non-existent")
 	if err == nil {
@@ -230,12 +232,12 @@ func TestSwitchContext(t *testing.T) {
 func TestGetClient(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to create context manager: %v", err)
 	}
-	
+
 	// Note: This will fail in test environment as the test clusters don't exist
 	// We're mainly testing the logic here
 	client, err := cm.GetClient("context-1")
@@ -250,7 +252,7 @@ func TestGetClient(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	}
-	
+
 	// Test client caching
 	// Even though connection fails, the same error should be returned
 	client2, err2 := cm.GetClient("context-1")
@@ -262,12 +264,12 @@ func TestGetClient(t *testing.T) {
 func TestGetNamespace(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to create context manager: %v", err)
 	}
-	
+
 	tests := []struct {
 		contextName string
 		expected    string
@@ -276,7 +278,7 @@ func TestGetNamespace(t *testing.T) {
 		{"context-2", "kube-system"},
 		{"non-existent", "default"}, // Should return default for non-existent
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.contextName, func(t *testing.T) {
 			ns := cm.GetNamespace(tt.contextName)
@@ -290,45 +292,45 @@ func TestGetNamespace(t *testing.T) {
 func TestRefreshContexts(t *testing.T) {
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to create context manager: %v", err)
 	}
-	
+
 	// Modify the kubeconfig file
 	config, err := clientcmd.LoadFromFile(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to load kubeconfig: %v", err)
 	}
-	
+
 	// Add a new context
 	config.Contexts["context-3"] = &clientcmdapi.Context{
 		Cluster:   "test-cluster-1",
 		AuthInfo:  "test-user-1",
 		Namespace: "new-namespace",
 	}
-	
+
 	if err := clientcmd.WriteToFile(*config, kubeconfigPath); err != nil {
 		t.Fatalf("Failed to write updated kubeconfig: %v", err)
 	}
-	
+
 	// Refresh contexts
 	err = cm.RefreshContexts()
 	if err != nil {
 		t.Fatalf("Failed to refresh contexts: %v", err)
 	}
-	
+
 	// Verify new context is loaded
 	contexts, err := cm.ListContexts()
 	if err != nil {
 		t.Fatalf("Failed to list contexts: %v", err)
 	}
-	
+
 	if len(contexts) != 3 {
 		t.Errorf("Expected 3 contexts after refresh, got %d", len(contexts))
 	}
-	
+
 	// Verify clients cache was cleared
 	if len(cm.clients) != 0 {
 		t.Error("Client cache should be cleared after refresh")
@@ -336,47 +338,76 @@ func TestRefreshContexts(t *testing.T) {
 }
 
 func TestConcurrentAccess(t *testing.T) {
+	// Set a reasonable timeout for the test
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	kubeconfigPath := createTestKubeconfig(t)
 	defer func() { _ = os.Remove(kubeconfigPath) }()
-	
+
 	cm, err := NewContextManager(kubeconfigPath)
 	if err != nil {
 		t.Fatalf("Failed to create context manager: %v", err)
 	}
-	
-	// Run concurrent operations
-	done := make(chan bool)
-	
+
+	// Run concurrent operations with buffered channel
+	done := make(chan bool, 3) // Buffer size 3 for 3 goroutines
+
 	// Goroutine 1: List contexts repeatedly
 	go func() {
+		defer func() { done <- true }()
 		for i := 0; i < 3; i++ {
-			_, _ = cm.ListContexts()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_, _ = cm.ListContexts()
+				time.Sleep(10 * time.Millisecond) // Small delay to prevent tight loop
+			}
 		}
-		done <- true
 	}()
-	
+
 	// Goroutine 2: Switch contexts (reduced iterations for CI performance)
 	go func() {
+		defer func() { done <- true }()
 		for i := 0; i < 2; i++ {
-			_ = cm.SwitchContext("context-1")
-			_ = cm.SwitchContext("context-2")
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_ = cm.SwitchContext("context-1")
+				time.Sleep(10 * time.Millisecond)
+				_ = cm.SwitchContext("context-2")
+				time.Sleep(10 * time.Millisecond)
+			}
 		}
-		done <- true
 	}()
-	
+
 	// Goroutine 3: Get current context
 	go func() {
+		defer func() { done <- true }()
 		for i := 0; i < 3; i++ {
-			_, _ = cm.GetCurrentContext()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_, _ = cm.GetCurrentContext()
+				time.Sleep(10 * time.Millisecond)
+			}
 		}
-		done <- true
 	}()
-	
-	// Wait for all goroutines
-	for i := 0; i < 3; i++ {
-		<-done
+
+	// Wait for all goroutines with timeout
+	completed := 0
+	for completed < 3 {
+		select {
+		case <-done:
+			completed++
+		case <-ctx.Done():
+			t.Fatal("Test timed out waiting for goroutines to complete")
+		}
 	}
-	
+
 	// If we get here without deadlock, test passes
 }
 

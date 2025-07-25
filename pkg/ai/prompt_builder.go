@@ -9,14 +9,14 @@ import (
 
 // PromptBuilder creates contextual AI prompts based on kubectl data and runbook knowledge
 type PromptBuilder struct {
-	systemPrompts map[string]string
+	systemPrompts    map[string]string
 	runbookKnowledge *RunbookKnowledge
 }
 
 // RunbookKnowledge contains kubectl runbook expertise
 type RunbookKnowledge struct {
 	categories         map[string][]string // category -> commands
-	troubleshootingMap map[string][]string // issue -> diagnostic commands  
+	troubleshootingMap map[string][]string // issue -> diagnostic commands
 	metricsCommands    []string
 	debuggingCommands  []string
 }
@@ -36,10 +36,10 @@ type PromptContext struct {
 func NewPromptBuilder() *PromptBuilder {
 	return &PromptBuilder{
 		systemPrompts: map[string]string{
-			"comprehensive": getComprehensiveSystemPrompt(),
-			"diagnostic":    getDiagnosticSystemPrompt(),
-			"optimization":  getOptimizationSystemPrompt(),
-			"query":         getQuerySystemPrompt(),
+			"comprehensive":  getComprehensiveSystemPrompt(),
+			"diagnostic":     getDiagnosticSystemPrompt(),
+			"optimization":   getOptimizationSystemPrompt(),
+			"query":          getQuerySystemPrompt(),
 			"infrastructure": getInfrastructureSystemPrompt(),
 		},
 		runbookKnowledge: initializeRunbookKnowledge(),
@@ -52,14 +52,14 @@ func initializeRunbookKnowledge() *RunbookKnowledge {
 		categories: map[string][]string{
 			"control-plane": {
 				"kubectl get --raw='/livez?verbose'",
-				"kubectl get --raw='/readyz?verbose'", 
+				"kubectl get --raw='/readyz?verbose'",
 				"kubectl get componentstatuses",
 				"kubectl get --raw='/metrics' | head -200",
 				"kubectl cluster-info",
 			},
 			"nodes": {
 				"kubectl get nodes -o wide",
-				"kubectl top nodes", 
+				"kubectl top nodes",
 				"kubectl describe nodes",
 				"kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[?(@.status==\"True\")].reason",
 			},
@@ -77,7 +77,7 @@ func initializeRunbookKnowledge() *RunbookKnowledge {
 			},
 			"networking": {
 				"kubectl get svc -A",
-				"kubectl get ep -A", 
+				"kubectl get ep -A",
 				"kubectl get ingress -A",
 			},
 			"storage": {
@@ -193,7 +193,7 @@ func (p *PromptBuilder) addKubectlResults(builder *strings.Builder, results map[
 				lines := strings.Split(output, "\n")
 				if len(lines) > 50 {
 					truncated := append(lines[:25], "... [truncated] ...")
-				truncated = append(truncated, lines[len(lines)-25:]...)
+					truncated = append(truncated, lines[len(lines)-25:]...)
 					output = strings.Join(truncated, "\n")
 				}
 			}
@@ -225,7 +225,7 @@ func (p *PromptBuilder) addKubectlResults(builder *strings.Builder, results map[
 // addClusterContext adds cluster context information to the prompt
 func (p *PromptBuilder) addClusterContext(builder *strings.Builder, ctx *ClusterContext) {
 	builder.WriteString("=== CLUSTER CONTEXT ===\n\n")
-	
+
 	fmt.Fprintf(builder, "Last Analysis: %s\n", ctx.LastAnalysis.Format(time.RFC3339))
 	fmt.Fprintf(builder, "Health Score: %.2f\n", ctx.HealthScore)
 	fmt.Fprintf(builder, "AI Confidence: %.2f\n", ctx.AIConfidence)
@@ -246,7 +246,7 @@ func (p *PromptBuilder) addClusterContext(builder *strings.Builder, ctx *Cluster
 		for _, issue := range ctx.KnownIssues {
 			if issue.Status == "active" {
 				fmt.Fprintf(builder, "- [%s] %s: %s (Resource: %s, Since: %s)\n",
-					issue.Severity, issue.Type, issue.Description, issue.Resource, 
+					issue.Severity, issue.Type, issue.Description, issue.Resource,
 					issue.FirstSeen.Format("2006-01-02"))
 			}
 		}
@@ -258,40 +258,40 @@ func (p *PromptBuilder) addClusterContext(builder *strings.Builder, ctx *Cluster
 // addHistoricalContext adds historical analysis data to the prompt
 func (p *PromptBuilder) addHistoricalContext(builder *strings.Builder, history []AnalysisSession) {
 	builder.WriteString("=== ANALYSIS HISTORY ===\n\n")
-	
+
 	fmt.Fprintf(builder, "Recent analysis sessions (%d):\n", len(history))
-	
+
 	for i, session := range history {
 		if i >= 3 { // Limit to most recent 3 for brevity
 			break
 		}
-		
+
 		fmt.Fprintf(builder, "\n## Session %d (%s):\n", i+1, session.Timestamp.Format("2006-01-02 15:04"))
 		fmt.Fprintf(builder, "Type: %s\n", session.AnalysisType)
 		fmt.Fprintf(builder, "Confidence: %.2f\n", session.Confidence)
 		fmt.Fprintf(builder, "Duration: %v\n", session.Duration)
-		
+
 		if session.AIResponse != "" && len(session.AIResponse) < 500 {
 			fmt.Fprintf(builder, "Summary: %s\n", session.AIResponse)
 		}
-		
+
 		if !session.Success && session.ErrorMessage != "" {
 			fmt.Fprintf(builder, "Error: %s\n", session.ErrorMessage)
 		}
 	}
-	
+
 	builder.WriteString("\n")
 }
 
 // addPatternContext adds recognized patterns to the prompt
 func (p *PromptBuilder) addPatternContext(builder *strings.Builder, patterns []ClusterPattern) {
 	builder.WriteString("=== RECOGNIZED PATTERNS ===\n\n")
-	
+
 	recentPatterns := patterns
 	if len(recentPatterns) > 5 {
 		recentPatterns = patterns[:5] // Limit to 5 most recent
 	}
-	
+
 	for _, pattern := range recentPatterns {
 		fmt.Fprintf(builder, "## Pattern: %s\n", pattern.PatternName)
 		fmt.Fprintf(builder, "Type: %s\n", pattern.PatternType)
@@ -299,11 +299,11 @@ func (p *PromptBuilder) addPatternContext(builder *strings.Builder, patterns []C
 		fmt.Fprintf(builder, "Frequency: %d occurrences\n", pattern.Frequency)
 		fmt.Fprintf(builder, "Confidence: %.2f\n", pattern.Confidence)
 		fmt.Fprintf(builder, "Last Seen: %s\n", pattern.LastSeen.Format("2006-01-02 15:04"))
-		
+
 		if pattern.Indicators != "" {
 			fmt.Fprintf(builder, "Indicators: %s\n", pattern.Indicators)
 		}
-		
+
 		builder.WriteString("\n")
 	}
 }
@@ -311,7 +311,7 @@ func (p *PromptBuilder) addPatternContext(builder *strings.Builder, patterns []C
 // addAnalysisInstructions adds specific instructions based on analysis type
 func (p *PromptBuilder) addAnalysisInstructions(builder *strings.Builder, analysisType string) {
 	builder.WriteString("=== ANALYSIS INSTRUCTIONS ===\n\n")
-	
+
 	// Get type-specific system prompt
 	if systemPrompt, exists := p.systemPrompts[analysisType]; exists {
 		builder.WriteString(systemPrompt)
@@ -319,9 +319,9 @@ func (p *PromptBuilder) addAnalysisInstructions(builder *strings.Builder, analys
 		// Default instructions
 		builder.WriteString(getDefaultAnalysisInstructions())
 	}
-	
+
 	builder.WriteString("\n")
-	
+
 	// Add common requirements
 	builder.WriteString(`
 RESPONSE REQUIREMENTS:

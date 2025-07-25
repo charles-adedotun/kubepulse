@@ -69,7 +69,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Load configuration
 	var cfg *config.Config
-	
+
 	// Check if config file is specified
 	configFile := viper.GetString("config")
 	if configFile != "" {
@@ -98,13 +98,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Create monitoring engine with AI enabled based on config
 	engineConfig := core.EngineConfig{
-		KubeClient:     client,
-		ContextName:    currentContext,
-		Interval:       interval,
-		AlertChan:      alertChan,
-		MetricsChan:    metricsChan,
-		EnableAI:       cfg.AI.Enabled,
-		AIConfig:       &cfg.AI,
+		KubeClient:  client,
+		ContextName: currentContext,
+		Interval:    interval,
+		AlertChan:   alertChan,
+		MetricsChan: metricsChan,
+		EnableAI:    cfg.AI.Enabled,
+		AIConfig:    &cfg.AI,
 	}
 	engine := core.NewEngine(engineConfig)
 
@@ -154,9 +154,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Engine:         engine,
 		ContextManager: contextManager,
 		Host:           cfg.Server.Host,
-		ReadTimeout:  cfg.Server.ReadTimeout,
-		WriteTimeout: cfg.Server.WriteTimeout,
-		UIConfig:     cfg.UI,
+		ReadTimeout:    cfg.Server.ReadTimeout,
+		WriteTimeout:   cfg.Server.WriteTimeout,
+		UIConfig:       cfg.UI,
 	}
 	apiServer := api.NewServer(serverConfig)
 
