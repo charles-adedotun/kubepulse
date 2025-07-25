@@ -189,20 +189,34 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("prompt too long: %d characters", len(sanitizedPrompt))
 	}
 
-	args := []string{
-		"-p", sanitizedPrompt,
-		"--max-turns", "1",
-		"--system-prompt", c.systemPrompt,
-		"--permission-mode", "bypassPermissions",
+	// Create temporary files for prompt and system prompt to avoid shell escaping issues
+	promptFile, err := os.CreateTemp("", "claude-prompt-*.txt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create prompt file: %w", err)
 	}
+	defer os.Remove(promptFile.Name())
+	
+	if _, err := promptFile.WriteString(sanitizedPrompt); err != nil {
+		return "", fmt.Errorf("failed to write prompt: %w", err)
+	}
+	promptFile.Close()
+
+	systemPromptFile, err := os.CreateTemp("", "claude-system-*.txt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create system prompt file: %w", err)
+	}
+	defer os.Remove(systemPromptFile.Name())
+	
+	if _, err := systemPromptFile.WriteString(c.systemPrompt); err != nil {
+		return "", fmt.Errorf("failed to write system prompt: %w", err)
+	}
+	systemPromptFile.Close()
 
 	// Use shell execution to inherit proper environment (like kubectl executor)
 	// This ensures Node.js/NVM environment is available for Claude CLI
-	escapedArgs := make([]string, len(args))
-	for i, arg := range args {
-		escapedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\"'\"'"))
-	}
-	cmdLine := fmt.Sprintf("%s %s", c.claudePath, strings.Join(escapedArgs, " "))
+	// Using file paths prevents injection since the content is in files, not in the command line
+	cmdLine := fmt.Sprintf("%s -p @%s --max-turns 1 --system-prompt @%s --permission-mode bypassPermissions",
+		c.claudePath, promptFile.Name(), systemPromptFile.Name())
 	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine)
 
 	var stdout, stderr bytes.Buffer
@@ -448,4 +462,83 @@ Please structure your response with:
 - SYSTEMIC_FIXES: Fundamental solutions
 - VALIDATION: How to verify the fix worked
 `
+}
+
+// HealthCheck performs an AI system health check
+func (c *Client) HealthCheck(ctx context.Context) (*AIHealthStatus, error) {
+	klog.V(2).Info("Performing AI system health check")
+	
+	start := time.Now()
+	status := &AIHealthStatus{
+		Timestamp: start,
+		Healthy:   false,
+		Version:   "unknown",
+		Features:  make(map[string]bool),
+		Metrics:   make(map[string]interface{}),
+	}
+
+	// Test basic Claude CLI availability
+	cmd := exec.CommandContext(ctx, c.claudePath, "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		status.Error = fmt.Sprintf("Claude CLI not available: %v", err)
+		return status, nil
+	}
+
+	status.Version = strings.TrimSpace(string(output))
+	status.Features["cli_available"] = true
+
+	// Test basic AI query functionality
+	testQuery := "Respond with exactly: 'AI_HEALTH_OK'"
+	testCmd := exec.CommandContext(ctx, c.claudePath, "-p", testQuery)
+	var testBuf bytes.Buffer
+	testCmd.Stdout = &testBuf
+	testCmd.Stderr = &testBuf
+
+	if err := testCmd.Run(); err != nil {
+		status.Error = fmt.Sprintf("AI query test failed: %v", err)
+		status.Features["query_working"] = false
+		return status, nil
+	}
+
+	testResponse := strings.TrimSpace(testBuf.String())
+	if strings.Contains(testResponse, "AI_HEALTH_OK") {
+		status.Features["query_working"] = true
+		status.Healthy = true
+	} else {
+		status.Error = "AI query test returned unexpected response"
+		status.Features["query_working"] = false
+	}
+
+	// Test circuit breaker status
+	if c.circuitBreaker != nil {
+		cbStatus := c.circuitBreaker.GetState()
+		status.Features["circuit_breaker"] = true
+		status.Metrics["circuit_breaker_state"] = cbStatus.String()
+		status.Metrics["failure_count"] = cbStatus
+	}
+
+	// Calculate response time
+	status.ResponseTime = time.Since(start)
+	status.Metrics["response_time_ms"] = status.ResponseTime.Milliseconds()
+
+	if status.Healthy {
+		klog.V(2).Infof("AI health check passed: version=%s, response_time=%v", 
+			status.Version, status.ResponseTime)
+	} else {
+		klog.Warningf("AI health check failed: %s", status.Error)
+	}
+
+	return status, nil
+}
+
+// AIHealthStatus represents the health status of the AI system
+type AIHealthStatus struct {
+	Timestamp    time.Time              `json:"timestamp"`
+	Healthy      bool                   `json:"healthy"`
+	Version      string                 `json:"version"`
+	ResponseTime time.Duration          `json:"response_time"`
+	Error        string                 `json:"error,omitempty"`
+	Features     map[string]bool        `json:"features"`
+	Metrics      map[string]interface{} `json:"metrics"`
 }

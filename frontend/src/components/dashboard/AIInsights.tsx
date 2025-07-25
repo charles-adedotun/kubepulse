@@ -27,10 +27,7 @@ export function AIInsights({ insights, loading, error }: AIInsightsProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>🤖</span>
-            AI Insights
-          </CardTitle>
+          <CardTitle>AI Insights</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground animate-pulse">
@@ -45,10 +42,7 @@ export function AIInsights({ insights, loading, error }: AIInsightsProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>🤖</span>
-            AI Insights
-          </CardTitle>
+          <CardTitle>AI Insights</CardTitle>
         </CardHeader>
         <CardContent>
           <Alert>
@@ -126,10 +120,7 @@ export function AIInsights({ insights, loading, error }: AIInsightsProps) {
 
         {insights.top_recommendations && insights.top_recommendations.length > 0 && (
           <div>
-            <h4 className="text-base font-semibold mb-3 flex items-center gap-2">
-              <span>🎯</span>
-              Top Recommendations
-            </h4>
+            <h4 className="text-base font-semibold mb-3">Top Recommendations</h4>
             <div className="space-y-3">
               {insights.top_recommendations.slice(0, 3).map((rec, index) => (
                 <div

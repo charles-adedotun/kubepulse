@@ -15,10 +15,7 @@ export function MetricsGrid({ metrics }: MetricsGridProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>📊</span>
-            Key Metrics
-          </CardTitle>
+          <CardTitle>Key Metrics</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">

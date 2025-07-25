@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -67,13 +68,20 @@ func (m *mockContextManager) GetNamespace(contextName string) string {
 // Helper to create test server
 func createTestServer(contextManager k8s.ContextManagerInterface) *Server {
 	router := mux.NewRouter()
+	ctx, cancel := context.WithCancel(context.Background())
 	server := &Server{
 		router:         router,
 		contextManager: contextManager,
 		clients:        make(map[*websocket.Conn]bool),
-		corsEnabled:    true,
-		corsOrigins:    []string{"*"},
 		uiConfig:       config.UIConfig{},
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		},
+		shutdown: make(chan struct{}),
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 	
 	// Register routes

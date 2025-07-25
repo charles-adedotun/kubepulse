@@ -78,65 +78,7 @@ export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps)
         // setError(null)
       } catch (err) {
         console.error('Failed to load predictions:', err)
-        // setError(err instanceof Error ? err.message : 'Unknown error')
-        // Generate mock data for demonstration
-        setPredictions({
-          predictions: [
-            {
-              alert_type: "Memory Pressure",
-              probability: 0.75,
-              time_window: "2-4 hours",
-              prevention: "Scale nodes or optimize pod resources",
-              confidence: 0.85,
-              severity: 'medium'
-            },
-            {
-              alert_type: "CPU Throttling",
-              probability: 0.45,
-              time_window: "6-8 hours",
-              prevention: "Adjust CPU limits or add nodes",
-              confidence: 0.72,
-              severity: 'low'
-            },
-            {
-              alert_type: "Pod Eviction Risk",
-              probability: 0.25,
-              time_window: "12-24 hours",
-              prevention: "Review resource quotas and node capacity",
-              confidence: 0.68,
-              severity: 'low'
-            }
-          ],
-          trend_analysis: {
-            cpu_trend: 'stable',
-            memory_trend: (clusterHealth?.score?.trend as 'increasing' | 'decreasing' | 'stable') || 'stable',
-            workload_trend: 'stable',
-            forecast_accuracy: 0.82
-          },
-          recommendations: [
-            {
-              category: "Resource Optimization",
-              action: "Implement horizontal pod autoscaling for high-usage workloads",
-              impact: "Reduce resource pressure by 30-40%",
-              urgency: 'medium',
-              time_to_implement: "2-3 hours"
-            },
-            {
-              category: "Monitoring",
-              action: "Set up alerts for memory usage above 70%",
-              impact: "Early warning system for resource issues",
-              urgency: 'high',
-              time_to_implement: "30 minutes"
-            },
-            {
-              category: "Capacity Planning",
-              action: "Plan for node scaling when cluster utilization exceeds 75%",
-              impact: "Prevent future resource bottlenecks",
-              urgency: 'low',
-              time_to_implement: "1-2 days"
-            }
-          ]
-        })
+        setPredictions(null)
       } finally {
         setLoading(false)
       }
@@ -167,12 +109,12 @@ export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps)
     }
   }
 
-  const getTrendIcon = (trend: string) => {
+  const getTrendText = (trend: string) => {
     switch (trend) {
-      case 'increasing': return '📈'
-      case 'decreasing': return '📉'
-      case 'stable': return '➡️'
-      default: return '❓'
+      case 'increasing': return 'Increasing'
+      case 'decreasing': return 'Decreasing'
+      case 'stable': return 'Stable'
+      default: return 'Unknown'
     }
   }
 
@@ -181,14 +123,28 @@ export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps)
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>🔮</span>
-              Predictive Analytics
-            </CardTitle>
+            <CardTitle>Predictive Analytics</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-muted-foreground animate-pulse">
-              Analyzing cluster patterns and generating predictions...
+            <div className="text-center py-8 text-muted-foreground">
+              Loading predictions...
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!predictions) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Predictive Analytics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-muted-foreground">
+              No predictions available. Ensure AI features are enabled.
             </div>
           </CardContent>
         </Card>
@@ -201,38 +157,26 @@ export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps)
       {/* Trend Analysis */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>📈</span>
-            Trend Analysis
-          </CardTitle>
+          <CardTitle>Trend Analysis</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-2xl mb-2">
-                {getTrendIcon(predictions?.trend_analysis.cpu_trend || 'stable')}
-              </div>
-              <div className="font-semibold">CPU Trend</div>
-              <div className="text-sm text-muted-foreground capitalize">
-                {predictions?.trend_analysis.cpu_trend || 'stable'}
+              <div className="text-lg font-semibold mb-2">CPU Trend</div>
+              <div className="text-sm text-muted-foreground">
+                {getTrendText(predictions?.trend_analysis.cpu_trend || 'stable')}
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl mb-2">
-                {getTrendIcon(predictions?.trend_analysis.memory_trend || 'stable')}
-              </div>
-              <div className="font-semibold">Memory Trend</div>
-              <div className="text-sm text-muted-foreground capitalize">
-                {predictions?.trend_analysis.memory_trend || 'stable'}
+              <div className="text-lg font-semibold mb-2">Memory Trend</div>
+              <div className="text-sm text-muted-foreground">
+                {getTrendText(predictions?.trend_analysis.memory_trend || 'stable')}
               </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl mb-2">
-                {getTrendIcon(predictions?.trend_analysis.workload_trend || 'stable')}
-              </div>
-              <div className="font-semibold">Workload Trend</div>
-              <div className="text-sm text-muted-foreground capitalize">
-                {predictions?.trend_analysis.workload_trend || 'stable'}
+              <div className="text-lg font-semibold mb-2">Workload Trend</div>
+              <div className="text-sm text-muted-foreground">
+                {getTrendText(predictions?.trend_analysis.workload_trend || 'stable')}
               </div>
             </div>
           </div>
@@ -247,10 +191,7 @@ export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps)
       {/* Predictions */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>🔮</span>
-            Potential Issues Predictions
-          </CardTitle>
+          <CardTitle>Potential Issues</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -288,10 +229,7 @@ export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps)
       {/* Proactive Recommendations */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>💡</span>
-            Proactive Recommendations
-          </CardTitle>
+          <CardTitle>Recommendations</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

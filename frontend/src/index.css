@@ -4,22 +4,30 @@
 
 @layer base {
   :root {
+  /* 60/30/10 Color Rule */
+  /* 60% - Neutral backgrounds */
   --color-background: oklch(0.985 0 0);
-  --color-foreground: oklch(0.145 0 0);
   --color-card: oklch(0.975 0 0);
-  --color-card-foreground: oklch(0.145 0 0);
-  --color-primary: oklch(0.487 0.213 250.5);
-  --color-primary-foreground: oklch(0.985 0 0);
+  
+  /* 30% - Secondary/muted elements */
   --color-secondary: oklch(0.941 0.005 264.5);
-  --color-secondary-foreground: oklch(0.145 0 0);
   --color-muted: oklch(0.941 0.005 264.5);
-  --color-muted-foreground: oklch(0.519 0.026 264.5);
-  --color-accent: oklch(0.941 0.005 264.5);
-  --color-accent-foreground: oklch(0.145 0 0);
-  --color-destructive: oklch(0.578 0.184 27.3);
-  --color-destructive-foreground: oklch(0.985 0 0);
   --color-border: oklch(0.895 0.009 264.5);
   --color-input: oklch(0.895 0.009 264.5);
+  
+  /* 10% - Primary accent & text */
+  --color-primary: oklch(0.487 0.213 250.5);
+  --color-foreground: oklch(0.145 0 0);
+  --color-destructive: oklch(0.578 0.184 27.3);
+  
+  /* Foreground colors */
+  --color-card-foreground: oklch(0.145 0 0);
+  --color-primary-foreground: oklch(0.985 0 0);
+  --color-secondary-foreground: oklch(0.145 0 0);
+  --color-muted-foreground: oklch(0.519 0.026 264.5);
+  --color-accent: oklch(0.487 0.213 250.5);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-destructive-foreground: oklch(0.985 0 0);
   --color-ring: oklch(0.487 0.213 250.5);
 
   /* Chart colors for data visualization */
@@ -57,22 +65,30 @@
   }
 
   .dark {
+  /* 60/30/10 Color Rule for Dark Theme */
+  /* 60% - Dark neutral backgrounds */
   --color-background: oklch(0.145 0 0);
-  --color-foreground: oklch(0.985 0 0);
-  --color-card: oklch(0.145 0 0);
-  --color-card-foreground: oklch(0.985 0 0);
-  --color-primary: oklch(0.487 0.213 250.5);
-  --color-primary-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.185 0 0);
+  
+  /* 30% - Secondary/muted elements */
   --color-secondary: oklch(0.219 0.008 264.5);
-  --color-secondary-foreground: oklch(0.985 0 0);
   --color-muted: oklch(0.219 0.008 264.5);
-  --color-muted-foreground: oklch(0.738 0.013 264.5);
-  --color-accent: oklch(0.219 0.008 264.5);
-  --color-accent-foreground: oklch(0.985 0 0);
-  --color-destructive: oklch(0.528 0.227 25.5);
-  --color-destructive-foreground: oklch(0.985 0 0);
   --color-border: oklch(0.219 0.008 264.5);
   --color-input: oklch(0.219 0.008 264.5);
+  
+  /* 10% - Primary accent & text */
+  --color-primary: oklch(0.487 0.213 250.5);
+  --color-foreground: oklch(0.985 0 0);
+  --color-destructive: oklch(0.528 0.227 25.5);
+  
+  /* Foreground colors */
+  --color-card-foreground: oklch(0.985 0 0);
+  --color-primary-foreground: oklch(0.985 0 0);
+  --color-secondary-foreground: oklch(0.985 0 0);
+  --color-muted-foreground: oklch(0.738 0.013 264.5);
+  --color-accent: oklch(0.487 0.213 250.5);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-destructive-foreground: oklch(0.985 0 0);
   --color-ring: oklch(0.487 0.213 250.5);
   }
 }

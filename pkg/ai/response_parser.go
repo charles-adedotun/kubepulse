@@ -252,10 +252,13 @@ func (p *ResponseParser) extractRecommendations(text string) []Recommendation {
 			rec := Recommendation{
 				Title:       p.generateTitle(matches[1]),
 				Description: matches[1],
-				Priority:    priority,
+				Priority:    p.convertPriorityToString(priority),
 				Category:    "operational",
 				Impact:      "medium",
-				Effort:      "medium",
+				Commands:    []string{},
+				References:  []string{},
+				Confidence:  0.8,
+				Automated:   false,
 			}
 			recommendations = append(recommendations, rec)
 			priority++
@@ -263,10 +266,13 @@ func (p *ResponseParser) extractRecommendations(text string) []Recommendation {
 			rec := Recommendation{
 				Title:       p.generateTitle(matches[1]),
 				Description: matches[1],
-				Priority:    priority,
+				Priority:    p.convertPriorityToString(priority),
 				Category:    "general",
 				Impact:      "medium",
-				Effort:      "low",
+				Commands:    []string{},
+				References:  []string{},
+				Confidence:  0.8,
+				Automated:   false,
 			}
 			recommendations = append(recommendations, rec)
 			priority++
@@ -278,14 +284,29 @@ func (p *ResponseParser) extractRecommendations(text string) []Recommendation {
 		recommendations = append(recommendations, Recommendation{
 			Title:       "Review AI Analysis",
 			Description: "Review the detailed analysis provided by the AI system",
-			Priority:    1,
+			Priority:    "high",
 			Category:    "general",
 			Impact:      "informational",
-			Effort:      "low",
+			Commands:    []string{},
+			References:  []string{},
+			Confidence:  0.8,
+			Automated:   false,
 		})
 	}
 
 	return recommendations
+}
+
+// convertPriorityToString converts integer priority to string
+func (p *ResponseParser) convertPriorityToString(priority int) string {
+	switch {
+	case priority <= 1:
+		return "high"
+	case priority <= 3:
+		return "medium"
+	default:
+		return "low"
+	}
 }
 
 // extractActions finds kubectl commands and action items

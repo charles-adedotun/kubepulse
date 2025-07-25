@@ -36,11 +36,44 @@ interface AlertInsights {
   }>
 }
 
+// Type guard to validate smart alerts response
+function isValidSmartAlertsResponse(data: any): data is { alerts: SmartAlert[], insights: AlertInsights } {
+  if (!data || typeof data !== 'object') {
+    return false
+  }
+
+  // Check alerts array
+  if (!Array.isArray(data.alerts)) {
+    return false
+  }
+
+  // Validate each alert structure
+  for (const alert of data.alerts) {
+    if (!alert || typeof alert !== 'object' ||
+        typeof alert.id !== 'string' ||
+        typeof alert.title !== 'string' ||
+        typeof alert.description !== 'string' ||
+        typeof alert.severity !== 'string' ||
+        !Array.isArray(alert.suggested_actions)) {
+      return false
+    }
+  }
+
+  // Check insights structure
+  if (!data.insights || typeof data.insights !== 'object' ||
+      typeof data.insights.total_alerts !== 'number' ||
+      !data.insights.alerts_by_severity ||
+      typeof data.insights.noise_reduction_rate !== 'number') {
+    return false
+  }
+
+  return true
+}
+
 export function SmartAlerts() {
   const [alerts, setAlerts] = useState<SmartAlert[]>([])
   const [insights, setInsights] = useState<AlertInsights | null>(null)
   const [loading, setLoading] = useState(true)
-  // const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchAlerts = async () => {
@@ -53,86 +86,38 @@ export function SmartAlerts() {
         }
         
         const data = await response.json()
-        setAlerts(data.alerts || [])
-        setInsights(data.insights || null)
-        // setError(null)
+        
+        // Validate response structure before using it
+        if (isValidSmartAlertsResponse(data)) {
+          setAlerts(data.alerts)
+          setInsights(data.insights)
+        } else {
+          console.warn('Received invalid smart alerts data structure:', data)
+          setAlerts([])
+          setInsights(null)
+        }
       } catch (err) {
         console.error('Failed to load smart alerts:', err)
-        // setError(err instanceof Error ? err.message : 'Unknown error')
-        // Generate mock data for demonstration
-        setAlerts([
-          {
-            id: 'alert-1',
-            type: 'threshold',
-            severity: 'medium',
-            title: 'Memory Usage Above Normal',
-            description: 'Node desktop-worker memory usage has exceeded 75% for the past 15 minutes',
-            resource: 'desktop-worker',
-            timestamp: new Date().toISOString(),
-            correlation_score: 0.85,
-            noise_reduced: true,
-            similar_alerts: 3,
-            suggested_actions: [
-              'Check for memory leaks in running pods',
-              'Consider scaling the node pool',
-              'Review memory limits on high-usage pods'
-            ]
-          },
-          {
-            id: 'alert-2',
-            type: 'anomaly',
-            severity: 'low',
-            title: 'Unusual Network Traffic Pattern',
-            description: 'Detected abnormal traffic patterns in service communication',
-            resource: 'cluster-network',
-            timestamp: new Date(Date.now() - 300000).toISOString(),
-            correlation_score: 0.72,
-            noise_reduced: false,
-            similar_alerts: 1,
-            suggested_actions: [
-              'Review network policies',
-              'Check for new deployments affecting traffic',
-              'Monitor for potential security issues'
-            ]
-          }
-        ])
-        setInsights({
-          total_alerts: 2,
-          alerts_by_severity: { low: 1, medium: 1, high: 0, critical: 0 },
-          noise_reduction_rate: 0.65,
-          correlation_success_rate: 0.78,
-          top_alert_sources: [
-            { source: 'Node Monitoring', count: 5, trend: 'stable' },
-            { source: 'Pod Health', count: 3, trend: 'decreasing' },
-            { source: 'Network Monitoring', count: 2, trend: 'increasing' }
-          ],
-          smart_grouping: [
-            {
-              group_name: 'Resource Pressure',
-              alert_count: 4,
-              common_cause: 'Increased workload demands',
-              recommendation: 'Consider horizontal scaling'
-            }
-          ]
-        })
+        setAlerts([])
+        setInsights(null)
       } finally {
         setLoading(false)
       }
     }
 
     fetchAlerts()
-    const interval = setInterval(fetchAlerts, 30000) // Refresh every 30 seconds
+    const interval = setInterval(fetchAlerts, 30000)
     
     return () => clearInterval(interval)
   }, [])
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'border-red-500 bg-red-50'
-      case 'high': return 'border-orange-500 bg-orange-50'
-      case 'medium': return 'border-yellow-500 bg-yellow-50'
-      case 'low': return 'border-blue-500 bg-blue-50'
-      default: return 'border-gray-500 bg-gray-50'
+      case 'critical': return 'border-destructive'
+      case 'high': return 'border-destructive/80'
+      case 'medium': return 'border-yellow-500'
+      case 'low': return 'border-muted'
+      default: return 'border-muted'
     }
   }
 
@@ -148,22 +133,12 @@ export function SmartAlerts() {
     }
   }
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'anomaly': return '🔍'
-      case 'threshold': return '📊'
-      case 'pattern': return '🔄'
-      case 'prediction': return '🔮'
-      default: return '⚠️'
-    }
-  }
-
-  const getTrendIcon = (trend: string) => {
+  const getTrendIndicator = (trend: string) => {
     switch (trend) {
-      case 'increasing': return '📈'
-      case 'decreasing': return '📉'
-      case 'stable': return '➡️'
-      default: return '❓'
+      case 'increasing': return '↑'
+      case 'decreasing': return '↓'
+      case 'stable': return '→'
+      default: return '-'
     }
   }
 
@@ -171,14 +146,11 @@ export function SmartAlerts() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>🚨</span>
-            Smart Alerts
-          </CardTitle>
+          <CardTitle>Smart Alerts</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground animate-pulse">
-            Loading intelligent alerts...
+          <div className="text-center py-8 text-muted-foreground">
+            Loading alerts...
           </div>
         </CardContent>
       </Card>
@@ -187,37 +159,34 @@ export function SmartAlerts() {
 
   return (
     <div className="space-y-6">
-      {/* Alert Insights Summary */}
+      {/* Alert Summary */}
       {insights && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>📊</span>
-              Alert Intelligence Summary
-            </CardTitle>
+            <CardTitle>Alert Summary</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
+                <div className="text-xl font-semibold">
                   {insights.total_alerts}
                 </div>
                 <div className="text-sm text-muted-foreground">Active Alerts</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-xl font-semibold">
                   {Math.round(insights.noise_reduction_rate * 100)}%
                 </div>
                 <div className="text-sm text-muted-foreground">Noise Reduced</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-xl font-semibold">
                   {Math.round(insights.correlation_success_rate * 100)}%
                 </div>
                 <div className="text-sm text-muted-foreground">Correlation Rate</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
+                <div className="text-xl font-semibold">
                   {insights.smart_grouping.length}
                 </div>
                 <div className="text-sm text-muted-foreground">Alert Groups</div>
@@ -226,16 +195,16 @@ export function SmartAlerts() {
 
             {/* Top Alert Sources */}
             <div className="space-y-2">
-              <h4 className="font-semibold text-sm">Top Alert Sources</h4>
+              <h4 className="text-base font-semibold">Top Alert Sources</h4>
               {insights.top_alert_sources.map((source, index) => (
                 <div key={index} className="flex items-center justify-between bg-secondary/50 rounded p-2">
                   <span className="text-sm">{source.source}</span>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline">
                       {source.count}
                     </Badge>
-                    <span className="text-sm">
-                      {getTrendIcon(source.trend)}
+                    <span className="text-sm font-semibold">
+                      {getTrendIndicator(source.trend)}
                     </span>
                   </div>
                 </div>
@@ -245,18 +214,15 @@ export function SmartAlerts() {
         </Card>
       )}
 
-      {/* Active Smart Alerts */}
+      {/* Active Alerts */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>🚨</span>
-            Active Smart Alerts
-          </CardTitle>
+          <CardTitle>Active Alerts</CardTitle>
         </CardHeader>
         <CardContent>
           {alerts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No active alerts - your cluster is running smoothly! ✨
+              No active alerts
             </div>
           ) : (
             <div className="space-y-4">
@@ -264,20 +230,14 @@ export function SmartAlerts() {
                 <Alert key={alert.id} className={getSeverityColor(alert.severity)}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <AlertTitle className="flex items-center gap-2 mb-2">
-                        {getTypeIcon(alert.type)}
+                      <AlertTitle className="mb-2">
                         {alert.title}
-                        <Badge variant={getSeverityVariant(alert.severity)} className="text-xs">
+                        <Badge variant={getSeverityVariant(alert.severity)} className="ml-2">
                           {alert.severity}
                         </Badge>
-                        {alert.noise_reduced && (
-                          <Badge variant="outline" className="text-xs">
-                            Noise Reduced
-                          </Badge>
-                        )}
                       </AlertTitle>
-                      <AlertDescription className="space-y-3">
-                        <p>{alert.description}</p>
+                      <AlertDescription className="space-y-2">
+                        <p className="text-sm">{alert.description}</p>
                         
                         <div className="flex items-center gap-4 text-sm">
                           <span><strong>Resource:</strong> {alert.resource}</span>
@@ -288,12 +248,12 @@ export function SmartAlerts() {
                         </div>
 
                         {alert.suggested_actions.length > 0 && (
-                          <div>
+                          <div className="mt-4">
                             <h5 className="font-semibold text-sm mb-2">Suggested Actions:</h5>
                             <ul className="space-y-1">
                               {alert.suggested_actions.map((action, index) => (
                                 <li key={index} className="flex items-start gap-2 text-sm">
-                                  <span className="mt-1">•</span>
+                                  <span className="mt-0.5">•</span>
                                   <span>{action}</span>
                                 </li>
                               ))}
@@ -302,7 +262,7 @@ export function SmartAlerts() {
                         )}
                       </AlertDescription>
                     </div>
-                    <div className="ml-4 text-right">
+                    <div className="ml-4">
                       <div className="text-xs text-muted-foreground mb-2">
                         {new Date(alert.timestamp).toLocaleTimeString()}
                       </div>
@@ -318,21 +278,18 @@ export function SmartAlerts() {
         </CardContent>
       </Card>
 
-      {/* Smart Grouping */}
+      {/* Alert Groups */}
       {insights?.smart_grouping && insights.smart_grouping.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>🔗</span>
-              Smart Alert Grouping
-            </CardTitle>
+            <CardTitle>Alert Groups</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {insights.smart_grouping.map((group, index) => (
                 <div key={index} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold">{group.group_name}</h4>
+                    <h4 className="text-base font-semibold">{group.group_name}</h4>
                     <Badge variant="secondary">
                       {group.alert_count} alerts
                     </Badge>

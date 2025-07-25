@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubepulse/kubepulse/internal/config"
 	"github.com/kubepulse/kubepulse/pkg/ai"
 	"github.com/kubepulse/kubepulse/pkg/alerts"
 	"github.com/kubepulse/kubepulse/pkg/ml"
@@ -38,6 +39,9 @@ type Engine struct {
 	assistant          *ai.Assistant
 	remediationEngine  *ai.RemediationEngine
 	smartAlertManager  *ai.SmartAlertManager
+	
+	// Enhanced AI system
+	analysisEngine     *ai.AnalysisEngine
 }
 
 // EngineConfig holds configuration for the monitoring engine
@@ -48,7 +52,7 @@ type EngineConfig struct {
 	AlertChan      chan Alert
 	MetricsChan    chan Metric
 	EnableAI       bool
-	AIConfig       *ai.Config
+	AIConfig       *config.AIConfig
 }
 
 // NewEngine creates a new monitoring engine
@@ -90,12 +94,14 @@ func NewEngine(config EngineConfig) *Engine {
 	}
 
 	// Initialize AI client if enabled
-	if config.EnableAI {
-		aiConfig := config.AIConfig
-		if aiConfig == nil {
-			aiConfig = &ai.Config{} // Use defaults
+	if config.EnableAI && config.AIConfig != nil && config.AIConfig.Enabled {
+		aiClientConfig := ai.Config{
+			ClaudePath:   config.AIConfig.ClaudePath,
+			MaxTurns:     config.AIConfig.MaxTurns,
+			Timeout:      config.AIConfig.Timeout,
+			SystemPrompt: config.AIConfig.SystemPrompt,
 		}
-		engine.aiClient = ai.NewClient(*aiConfig)
+		engine.aiClient = ai.NewClient(aiClientConfig)
 
 		// Initialize AI components
 		engine.predictiveAnalyzer = ai.NewPredictiveAnalyzer(engine.aiClient)
@@ -103,9 +109,46 @@ func NewEngine(config EngineConfig) *Engine {
 		engine.smartAlertManager = ai.NewSmartAlertManager(engine.aiClient)
 
 		// Initialize remediation engine with safety checks
-		executor := ai.NewKubectlExecutor("")
+		executor := ai.NewRemediationKubectlExecutor("")
 		safetyChecker := ai.NewDefaultSafetyChecker()
 		engine.remediationEngine = ai.NewRemediationEngine(engine.aiClient, executor, safetyChecker)
+
+		// Initialize enhanced AI analysis system
+		dbPath := config.AIConfig.DatabasePath
+		if dbPath == "" {
+			dbPath = "./kubepulse.db"
+		}
+		database, err := ai.NewDatabase(dbPath)
+		if err != nil {
+			klog.Errorf("Failed to initialize AI database: %v", err)
+		} else {
+			kubectlExecutor := ai.NewKubectlExecutor(ai.KubectlExecutorConfig{
+				Database: database,
+			})
+			
+			analysisEngineConfig := ai.AnalysisEngineConfig{
+				AIClient: engine.aiClient,
+				Database: database,
+				Executor: kubectlExecutor,
+			}
+			
+			engine.analysisEngine = ai.NewAnalysisEngine(analysisEngineConfig)
+			klog.Info("Enhanced AI analysis system initialized")
+		}
+
+		// Perform AI health check during initialization
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		healthStatus, err := engine.aiClient.HealthCheck(ctx)
+		if err != nil {
+			klog.Errorf("AI health check failed during initialization: %v", err)
+		} else if healthStatus.Healthy {
+			klog.Infof("AI system health check passed: version=%s, response_time=%v", 
+				healthStatus.Version, healthStatus.ResponseTime)
+		} else {
+			klog.Warningf("AI system unhealthy: %s", healthStatus.Error)
+		}
 
 		klog.Info("AI-powered diagnostics enabled with predictive analytics, assistant, and auto-remediation")
 	}
@@ -281,8 +324,10 @@ func (e *Engine) processResult(result CheckResult) {
 
 			select {
 			case e.alertChan <- alert:
-			case <-time.After(time.Second):
-				klog.Warning("Alert channel full, dropping alert")
+			case <-e.ctx.Done():
+				return
+			default:
+				klog.V(3).Info("Alert channel full, dropping alert")
 			}
 		}
 	}
@@ -292,8 +337,10 @@ func (e *Engine) processResult(result CheckResult) {
 		for _, metric := range result.Metrics {
 			select {
 			case e.metricsChan <- metric:
-			case <-time.After(time.Second):
-				klog.Warning("Metrics channel full, dropping metric")
+			case <-e.ctx.Done():
+				return
+			default:
+				klog.V(3).Info("Metrics channel full, dropping metric")
 			}
 		}
 	}
@@ -330,6 +377,21 @@ func (e *Engine) GetResult(name string) (CheckResult, bool) {
 
 	result, exists := e.results[name]
 	return result, exists
+}
+
+// UpdateClient updates the Kubernetes client and context
+func (e *Engine) UpdateClient(client kubernetes.Interface, contextName string) {
+	e.client = client
+	e.currentContext = contextName
+	klog.Infof("Engine updated with new client for context: %s", contextName)
+}
+
+// GetCurrentContext returns the current context name
+func (e *Engine) GetCurrentContext() string {
+	if e.currentContext == "" {
+		return "default"
+	}
+	return e.currentContext
 }
 
 // GetClusterHealth returns the overall cluster health
@@ -409,14 +471,31 @@ func (e *Engine) calculateScore(result CheckResult) float64 {
 
 // getWeight returns the weight based on check criticality
 func (e *Engine) getWeight(result CheckResult) float64 {
-	// TODO: Get criticality from check
-	// For now, return default weight
+	// Weight based on check type - critical checks have higher weight
+	weights := map[string]float64{
+		"node-health":    2.0,  // Nodes are critical infrastructure
+		"pod-health":     1.5,  // Pods are important but replaceable
+		"service-health": 1.0,  // Services are important for connectivity
+		"deployment":     1.2,  // Deployments affect availability
+		"statefulset":    1.5,  // StatefulSets are harder to recover
+		"daemonset":      1.3,  // DaemonSets affect all nodes
+	}
+	
+	// Check if we have a specific weight for this check type
+	for checkType, weight := range weights {
+		if strings.Contains(strings.ToLower(result.Name), checkType) {
+			return weight
+		}
+	}
+	
+	// Default weight
 	return 1.0
 }
 
 // runAIAnalysis performs AI-powered analysis on health check failures
 func (e *Engine) runAIAnalysis(result CheckResult) {
 	if e.aiClient == nil {
+		klog.V(3).Info("AI client not enabled, skipping AI analysis")
 		return
 	}
 
@@ -663,9 +742,9 @@ func (e *Engine) convertToAICheckResult(result CheckResult) ai.CheckResult {
 		}
 	}
 
-	aiPredictions := make([]ai.Prediction, len(result.Predictions))
+	aiPredictions := make([]ai.HealthPrediction, len(result.Predictions))
 	for i, pred := range result.Predictions {
-		aiPredictions[i] = ai.Prediction{
+		aiPredictions[i] = ai.HealthPrediction{
 			Timestamp:   pred.Timestamp,
 			Status:      ai.HealthStatus(pred.Status),
 			Probability: pred.Probability,
@@ -706,4 +785,9 @@ func (e *Engine) convertToAIClusterHealth(clusterHealth ClusterHealth) ai.Cluste
 		Checks:    aiChecks,
 		Timestamp: clusterHealth.Timestamp,
 	}
+}
+
+// GetAnalysisEngine returns the enhanced AI analysis engine
+func (e *Engine) GetAnalysisEngine() *ai.AnalysisEngine {
+	return e.analysisEngine
 }

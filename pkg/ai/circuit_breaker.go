@@ -41,11 +41,13 @@ type CircuitBreakerConfig struct {
 
 // CircuitBreaker implements the circuit breaker pattern for AI calls
 type CircuitBreaker struct {
-	config       CircuitBreakerConfig
-	state        CircuitState
-	failures     int
-	lastFailTime time.Time
-	mutex        sync.RWMutex
+	config          CircuitBreakerConfig
+	state           CircuitState
+	failures        int
+	lastFailTime    time.Time
+	mutex           sync.RWMutex
+	backoffAttempts int           // Track attempts for exponential backoff
+	baseTimeout     time.Duration // Base timeout for backoff calculation
 }
 
 // NewCircuitBreaker creates a new circuit breaker
@@ -61,8 +63,9 @@ func NewCircuitBreaker(config CircuitBreakerConfig) *CircuitBreaker {
 	}
 
 	return &CircuitBreaker{
-		config: config,
-		state:  CircuitClosed,
+		config:      config,
+		state:       CircuitClosed,
+		baseTimeout: config.Timeout,
 	}
 }
 
@@ -90,8 +93,11 @@ func (cb *CircuitBreaker) canExecute() bool {
 	case CircuitClosed:
 		return true
 	case CircuitOpen:
-		// Check if timeout has passed
-		if time.Since(cb.lastFailTime) > cb.config.Timeout {
+		// Calculate exponential backoff timeout
+		backoffTimeout := cb.calculateBackoffTimeout()
+		
+		// Check if backoff timeout has passed
+		if time.Since(cb.lastFailTime) > backoffTimeout {
 			cb.setState(CircuitHalfOpen)
 			return true
 		}
@@ -101,6 +107,27 @@ func (cb *CircuitBreaker) canExecute() bool {
 	default:
 		return false
 	}
+}
+
+// calculateBackoffTimeout calculates timeout with exponential backoff
+func (cb *CircuitBreaker) calculateBackoffTimeout() time.Duration {
+	// Exponential backoff: baseTimeout * 2^attempts
+	// Cap at 10 attempts to prevent overflow
+	attempts := cb.backoffAttempts
+	if attempts > 10 {
+		attempts = 10
+	}
+	
+	multiplier := 1 << attempts // 2^attempts
+	timeout := cb.baseTimeout * time.Duration(multiplier)
+	
+	// Cap maximum timeout at 30 minutes
+	maxTimeout := 30 * time.Minute
+	if timeout > maxTimeout {
+		timeout = maxTimeout
+	}
+	
+	return timeout
 }
 
 // handleResult processes the result of the function execution
@@ -114,9 +141,11 @@ func (cb *CircuitBreaker) handleResult(err error) {
 
 		if cb.state == CircuitHalfOpen {
 			// Failed in half-open state, go back to open
+			cb.backoffAttempts++ // Increment backoff attempts
 			cb.setState(CircuitOpen)
 		} else if cb.failures >= cb.config.MaxFailures {
 			// Too many failures, open the circuit
+			cb.backoffAttempts = 0 // Reset backoff on new circuit open
 			cb.setState(CircuitOpen)
 		}
 	} else {
@@ -126,6 +155,7 @@ func (cb *CircuitBreaker) handleResult(err error) {
 			cb.setState(CircuitClosed)
 		}
 		cb.failures = 0
+		cb.backoffAttempts = 0 // Reset backoff on success
 	}
 }
 
@@ -164,6 +194,7 @@ func (cb *CircuitBreaker) Reset() {
 	oldState := cb.state
 	cb.state = CircuitClosed
 	cb.failures = 0
+	cb.backoffAttempts = 0 // Reset backoff attempts
 
 	klog.V(2).Infof("Circuit breaker manually reset from %s to closed", oldState)
 

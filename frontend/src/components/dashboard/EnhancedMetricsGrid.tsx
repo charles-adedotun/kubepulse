@@ -56,10 +56,7 @@ export function EnhancedMetricsGrid({ metrics, clusterStats }: EnhancedMetricsGr
       {/* Cluster Overview */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>🎯</span>
-            Cluster Overview
-          </CardTitle>
+          <CardTitle>Cluster Overview</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -97,10 +94,7 @@ export function EnhancedMetricsGrid({ metrics, clusterStats }: EnhancedMetricsGr
       {cpuMetrics.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>💻</span>
-              Resource Utilization by Node
-            </CardTitle>
+            <CardTitle>Resource Utilization by Node</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -152,10 +146,7 @@ export function EnhancedMetricsGrid({ metrics, clusterStats }: EnhancedMetricsGr
         {/* Nodes */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <span>🖥️</span>
-              Nodes
-            </CardTitle>
+            <CardTitle className="text-base">Nodes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -176,10 +167,7 @@ export function EnhancedMetricsGrid({ metrics, clusterStats }: EnhancedMetricsGr
         {/* Pods */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <span>📦</span>
-              Pods
-            </CardTitle>
+            <CardTitle className="text-base">Pods</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -200,10 +188,7 @@ export function EnhancedMetricsGrid({ metrics, clusterStats }: EnhancedMetricsGr
         {/* Services */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <span>🔗</span>
-              Services
-            </CardTitle>
+            <CardTitle className="text-base">Services</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

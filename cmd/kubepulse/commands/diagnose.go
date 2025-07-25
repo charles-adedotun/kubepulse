@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/kubepulse/kubepulse/internal/config"
 	"github.com/kubepulse/kubepulse/pkg/ai"
 	"github.com/kubepulse/kubepulse/pkg/core"
 	"github.com/kubepulse/kubepulse/pkg/health"
@@ -56,18 +58,27 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("kubernetes client not initialized")
 	}
 
-	// Initialize AI client
-	aiConfig := ai.Config{
-		ClaudePath: "claude", // Assume claude is in PATH
+	// Create AI config and client
+	aiConfig := &config.AIConfig{
+		Enabled:    true,
+		ClaudePath: "claude",
 		MaxTurns:   3,
+		Timeout:    120 * time.Second,
 	}
-	aiClient := ai.NewClient(aiConfig)
+	
+	// Create AI client directly for diagnosis
+	aiClientConfig := ai.Config{
+		ClaudePath:   aiConfig.ClaudePath,
+		MaxTurns:     aiConfig.MaxTurns,
+		Timeout:      aiConfig.Timeout,
+	}
+	aiClient := ai.NewClient(aiClientConfig)
 
 	// Create monitoring engine to get health check results
 	engineConfig := core.EngineConfig{
 		KubeClient: client,
 		EnableAI:   true,
-		AIConfig:   &aiConfig,
+		AIConfig:   aiConfig,
 	}
 	engine := core.NewEngine(engineConfig)
 
@@ -243,7 +254,7 @@ func displayTextDiagnosis(response *ai.AnalysisResponse) {
 			fmt.Printf("  %d. %s\n", i+1, rec.Title)
 			fmt.Printf("     %s\n", rec.Description)
 			if rec.Impact != "" {
-				fmt.Printf("     Impact: %s | Effort: %s\n", rec.Impact, rec.Effort)
+				fmt.Printf("     Impact: %s\n", rec.Impact)
 			}
 			fmt.Println()
 		}
@@ -372,9 +383,9 @@ func convertCoreToAICheckResult(result core.CheckResult) ai.CheckResult {
 		}
 	}
 
-	aiPredictions := make([]ai.Prediction, len(result.Predictions))
+	aiPredictions := make([]ai.HealthPrediction, len(result.Predictions))
 	for i, pred := range result.Predictions {
-		aiPredictions[i] = ai.Prediction{
+		aiPredictions[i] = ai.HealthPrediction{
 			Timestamp:   pred.Timestamp,
 			Status:      ai.HealthStatus(pred.Status),
 			Probability: pred.Probability,

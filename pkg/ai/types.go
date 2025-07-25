@@ -41,28 +41,7 @@ type AnalysisResponse struct {
 	Duration        time.Duration          `json:"duration"`
 }
 
-// SeverityLevel represents the severity of an issue
-type SeverityLevel string
-
-const (
-	SeverityLow      SeverityLevel = "low"
-	SeverityMedium   SeverityLevel = "medium"
-	SeverityHigh     SeverityLevel = "high"
-	SeverityCritical SeverityLevel = "critical"
-	SeverityInfo     SeverityLevel = "info"
-)
-
-// Recommendation represents an AI-generated recommendation
-type Recommendation struct {
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Priority    int               `json:"priority"`
-	Category    string            `json:"category"`
-	Impact      string            `json:"impact"`
-	Effort      string            `json:"effort"`
-	References  []string          `json:"references,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-}
+// SeverityLevel and Recommendation are defined in database_types.go
 
 // SuggestedAction represents an actionable item
 type SuggestedAction struct {
@@ -159,11 +138,11 @@ type CheckResult struct {
 	Timestamp   time.Time              `json:"timestamp"`
 	Duration    time.Duration          `json:"duration"`
 	Metrics     []Metric               `json:"metrics,omitempty"`
-	Predictions []Prediction           `json:"predictions,omitempty"`
+	Predictions []HealthPrediction      `json:"predictions,omitempty"`
 }
 
 // Prediction represents an ML prediction
-type Prediction struct {
+type HealthPrediction struct {
 	Timestamp   time.Time    `json:"timestamp"`
 	Status      HealthStatus `json:"status"`
 	Probability float64      `json:"probability"`

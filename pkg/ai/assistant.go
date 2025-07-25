@@ -19,12 +19,12 @@ type Assistant struct {
 // KnowledgeBase stores cluster-specific knowledge
 type KnowledgeBase struct {
 	clusterContext map[string]interface{}
-	solutions      map[string][]Solution
+	solutions      map[string][]AssistantSolution
 	patterns       []Pattern
 }
 
-// Solution represents a solution to a known problem
-type Solution struct {
+// AssistantSolution represents a solution to a known problem in the assistant context
+type AssistantSolution struct {
 	Problem     string
 	Solution    string
 	Commands    []string
@@ -57,7 +57,7 @@ func NewAssistant(client *Client) *Assistant {
 		analyzer: NewPredictiveAnalyzer(client),
 		knowledge: &KnowledgeBase{
 			clusterContext: make(map[string]interface{}),
-			solutions:      make(map[string][]Solution),
+			solutions:      make(map[string][]AssistantSolution),
 			patterns:       []Pattern{},
 		},
 	}
@@ -112,7 +112,7 @@ func (a *Assistant) Query(ctx context.Context, question string, clusterHealth *C
 func (a *Assistant) LearnFromFeedback(ctx context.Context, query string, response *QueryResponse, helpful bool) {
 	if helpful {
 		// Store successful solutions
-		solution := Solution{
+		solution := AssistantSolution{
 			Problem:     query,
 			Solution:    response.Answer,
 			Commands:    response.Commands,

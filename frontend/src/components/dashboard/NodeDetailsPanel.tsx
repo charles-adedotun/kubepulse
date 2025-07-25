@@ -48,10 +48,7 @@ export function NodeDetailsPanel({ nodes }: NodeDetailsPanelProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>🖥️</span>
-            Node Details
-          </CardTitle>
+          <CardTitle>Node Details</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
@@ -163,10 +160,7 @@ export function NodeDetailsPanel({ nodes }: NodeDetailsPanelProps) {
       {/* Cluster-wide Node Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>📊</span>
-            Cluster Node Summary
-          </CardTitle>
+          <CardTitle>Cluster Node Summary</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">

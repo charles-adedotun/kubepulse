@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/kubepulse/kubepulse/internal/config"
-	"github.com/kubepulse/kubepulse/pkg/ai"
 	"github.com/kubepulse/kubepulse/pkg/api"
 	"github.com/kubepulse/kubepulse/pkg/core"
 	"github.com/kubepulse/kubepulse/pkg/health"
@@ -97,20 +96,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 	alertChan := make(chan core.Alert, 100)
 	metricsChan := make(chan core.Metric, 1000)
 
-	// Create monitoring engine with AI enabled
-	aiConfig := ai.Config{
-		ClaudePath: "claude", // Assume claude is in PATH
-		MaxTurns:   3,
-	}
-
+	// Create monitoring engine with AI enabled based on config
 	engineConfig := core.EngineConfig{
 		KubeClient:     client,
 		ContextName:    currentContext,
 		Interval:       interval,
 		AlertChan:      alertChan,
 		MetricsChan:    metricsChan,
-		EnableAI:       true,
-		AIConfig:       &aiConfig,
+		EnableAI:       cfg.AI.Enabled,
+		AIConfig:       &cfg.AI,
 	}
 	engine := core.NewEngine(engineConfig)
 
@@ -160,8 +154,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Engine:         engine,
 		ContextManager: contextManager,
 		Host:           cfg.Server.Host,
-		CORSEnabled:    cfg.Server.CORSEnabled,
-		CORSOrigins:    cfg.Server.CORSOrigins,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 		UIConfig:     cfg.UI,
@@ -202,7 +194,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		for {
 			select {
 			case <-broadcastTicker.C:
-				health := engine.GetClusterHealth("default")
+				// Get the current context from the engine
+				health := engine.GetClusterHealth(engine.GetCurrentContext())
 				apiServer.BroadcastToClients(health)
 			case <-ctx.Done():
 				return
@@ -262,7 +255,6 @@ func displayStartupInfo(cfg *config.Config) {
 	fmt.Printf("│  Mode: %s                          │\n", getServerMode(!cfg.Server.EnableWeb, cfg.Server.EnableWeb))
 	fmt.Printf("│  Monitoring Interval: %s                │\n", cfg.Monitoring.Interval.String())
 	fmt.Printf("│  UI Refresh Interval: %s               │\n", cfg.UI.RefreshInterval.String())
-	fmt.Printf("│  CORS: %v                              │\n", cfg.Server.CORSEnabled)
 	fmt.Printf("└─────────────────────────────────────────┘\n\n")
 
 	// Display feature flags

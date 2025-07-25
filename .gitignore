@@ -57,9 +57,12 @@ frontend/.vite/
 kubepulse.yaml
 config.yaml
 *.kubeconfig
+kubepulse.db
+main
 
 # Test artifacts
 coverage/
+coverage.txt
 *.cover
 *.coverprofile
 test-results/

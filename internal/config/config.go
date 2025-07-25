@@ -31,6 +31,9 @@ type Config struct {
 
 	// UI settings
 	UI UIConfig `yaml:"ui" mapstructure:"ui"`
+
+	// AI settings
+	AI AIConfig `yaml:"ai" mapstructure:"ai"`
 }
 
 // KubernetesConfig holds Kubernetes-related configuration
@@ -100,8 +103,6 @@ type ServerConfig struct {
 	Port         int      `yaml:"port" mapstructure:"port"`
 	Host         string   `yaml:"host" mapstructure:"host"`
 	EnableWeb    bool     `yaml:"enable_web" mapstructure:"enable_web"`
-	CORSEnabled  bool     `yaml:"cors_enabled" mapstructure:"cors_enabled"`
-	CORSOrigins  []string `yaml:"cors_origins" mapstructure:"cors_origins"`
 	ReadTimeout  time.Duration `yaml:"read_timeout" mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `yaml:"write_timeout" mapstructure:"write_timeout"`
 }
@@ -122,6 +123,25 @@ type UIFeatures struct {
 	PredictiveAnalytics bool `yaml:"predictive_analytics" mapstructure:"predictive_analytics"`
 	SmartAlerts         bool `yaml:"smart_alerts" mapstructure:"smart_alerts"`
 	NodeDetails         bool `yaml:"node_details" mapstructure:"node_details"`
+}
+
+// AIConfig holds AI-related configuration
+type AIConfig struct {
+	Enabled      bool          `yaml:"enabled" mapstructure:"enabled"`
+	ClaudePath   string        `yaml:"claude_path" mapstructure:"claude_path"`
+	MaxTurns     int           `yaml:"max_turns" mapstructure:"max_turns"`
+	Timeout      time.Duration `yaml:"timeout" mapstructure:"timeout"`
+	SystemPrompt string        `yaml:"system_prompt" mapstructure:"system_prompt"`
+	DatabasePath string        `yaml:"database_path" mapstructure:"database_path"`
+	Features     AIFeatures    `yaml:"features" mapstructure:"features"`
+}
+
+// AIFeatures holds AI feature flags
+type AIFeatures struct {
+	ContextAwareAnalysis bool `yaml:"context_aware_analysis" mapstructure:"context_aware_analysis"`
+	PredictiveAnalysis   bool `yaml:"predictive_analysis" mapstructure:"predictive_analysis"`
+	AutoRemediation      bool `yaml:"auto_remediation" mapstructure:"auto_remediation"`
+	SmartAlerts          bool `yaml:"smart_alerts" mapstructure:"smart_alerts"`
 }
 
 // LoadConfig loads configuration from file and environment
@@ -157,8 +177,6 @@ func LoadConfig(configPath string) (*Config, error) {
 			Port:         8080,
 			Host:         "",
 			EnableWeb:    true,
-			CORSEnabled:  true,
-			CORSOrigins:  []string{"*"},
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 15 * time.Second,
 		},
@@ -173,6 +191,19 @@ func LoadConfig(configPath string) (*Config, error) {
 				PredictiveAnalytics: true,
 				SmartAlerts:         true,
 				NodeDetails:         true,
+			},
+		},
+		AI: AIConfig{
+			Enabled:      false, // Disabled by default, must be explicitly enabled
+			ClaudePath:   "claude",
+			MaxTurns:     3,
+			Timeout:      120 * time.Second,
+			DatabasePath: "~/.kubepulse/ai.db",
+			Features: AIFeatures{
+				ContextAwareAnalysis: true,
+				PredictiveAnalysis:   true,
+				AutoRemediation:      false, // Disabled by default for safety
+				SmartAlerts:          true,
 			},
 		},
 	}
@@ -219,7 +250,6 @@ func loadFromEnv(config *Config) error {
 	_ = viper.BindEnv("server.port", "KUBEPULSE_PORT")
 	_ = viper.BindEnv("server.host", "KUBEPULSE_HOST")
 	_ = viper.BindEnv("server.enable_web", "KUBEPULSE_WEB_ENABLED")
-	_ = viper.BindEnv("server.cors_enabled", "KUBEPULSE_CORS_ENABLED")
 	_ = viper.BindEnv("ui.refresh_interval", "KUBEPULSE_UI_REFRESH")
 	_ = viper.BindEnv("ui.theme", "KUBEPULSE_UI_THEME")
 
@@ -241,9 +271,6 @@ func loadFromEnv(config *Config) error {
 	}
 	if viper.IsSet("server.enable_web") {
 		config.Server.EnableWeb = viper.GetBool("server.enable_web")
-	}
-	if viper.IsSet("server.cors_enabled") {
-		config.Server.CORSEnabled = viper.GetBool("server.cors_enabled")
 	}
 	if viper.IsSet("ui.refresh_interval") {
 		config.UI.RefreshInterval = viper.GetDuration("ui.refresh_interval")

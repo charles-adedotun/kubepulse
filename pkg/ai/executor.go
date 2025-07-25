@@ -10,16 +10,16 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// KubectlExecutor implements CommandExecutor using kubectl
-type KubectlExecutor struct {
+// RemediationKubectlExecutor implements CommandExecutor using kubectl for remediation
+type RemediationKubectlExecutor struct {
 	kubectlPath string
 	namespace   string
 	dryRunMode  bool
 }
 
-// NewKubectlExecutor creates a new kubectl executor
-func NewKubectlExecutor(namespace string) *KubectlExecutor {
-	return &KubectlExecutor{
+// NewRemediationKubectlExecutor creates a new kubectl executor for remediation
+func NewRemediationKubectlExecutor(namespace string) *RemediationKubectlExecutor {
+	return &RemediationKubectlExecutor{
 		kubectlPath: "kubectl",
 		namespace:   namespace,
 		dryRunMode:  false,
@@ -27,7 +27,7 @@ func NewKubectlExecutor(namespace string) *KubectlExecutor {
 }
 
 // Execute runs a kubectl command
-func (k *KubectlExecutor) Execute(ctx context.Context, command string) (string, error) {
+func (k *RemediationKubectlExecutor) Execute(ctx context.Context, command string) (string, error) {
 	if k.dryRunMode {
 		return k.DryRun(ctx, command)
 	}
@@ -59,7 +59,7 @@ func (k *KubectlExecutor) Execute(ctx context.Context, command string) (string, 
 }
 
 // DryRun simulates command execution
-func (k *KubectlExecutor) DryRun(ctx context.Context, command string) (string, error) {
+func (k *RemediationKubectlExecutor) DryRun(ctx context.Context, command string) (string, error) {
 	// Add --dry-run flag
 	if !strings.Contains(command, "--dry-run") {
 		command = strings.Replace(command, "kubectl", "kubectl --dry-run=client", 1)

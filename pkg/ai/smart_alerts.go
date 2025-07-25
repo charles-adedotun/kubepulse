@@ -31,7 +31,7 @@ type SmartAlertManager struct {
 
 // AlertHistory tracks alert patterns
 type AlertHistory struct {
-	alerts     []SmartAlert
+	alerts     []IntelligentAlert
 	patterns   map[string]*AlertPattern
 	maxHistory int
 }
@@ -46,8 +46,8 @@ type AlertPattern struct {
 	Correlated  []string
 }
 
-// SmartAlert represents an intelligent alert
-type SmartAlert struct {
+// IntelligentAlert represents an enhanced alert with AI analysis
+type IntelligentAlert struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Severity  string    `json:"severity"`
@@ -84,7 +84,7 @@ type NoiseSuppressor struct {
 // SuppressionRule defines when to suppress alerts
 type SuppressionRule struct {
 	Name      string
-	Condition func(alert SmartAlert, history []SmartAlert) bool
+	Condition func(alert IntelligentAlert, history []IntelligentAlert) bool
 	Action    string
 }
 
@@ -93,7 +93,7 @@ func NewSmartAlertManager(client *Client) *SmartAlertManager {
 	return &SmartAlertManager{
 		client: client,
 		alertHistory: &AlertHistory{
-			alerts:     []SmartAlert{},
+			alerts:     []IntelligentAlert{},
 			patterns:   make(map[string]*AlertPattern),
 			maxHistory: 10000,
 		},
@@ -113,12 +113,12 @@ func NewSmartAlertManager(client *Client) *SmartAlertManager {
 }
 
 // ProcessAlert intelligently processes an alert
-func (m *SmartAlertManager) ProcessAlert(ctx context.Context, basicAlert Alert) (*SmartAlert, error) {
+func (m *SmartAlertManager) ProcessAlert(ctx context.Context, basicAlert Alert) (*IntelligentAlert, error) {
 	// Convert to smart alert
-	smartAlert := SmartAlert{
+	smartAlert := IntelligentAlert{
 		ID:        basicAlert.ID,
 		Name:      basicAlert.Name,
-		Severity:  string(basicAlert.Severity),
+		Severity:  basicAlert.Severity,
 		Message:   basicAlert.Message,
 		Resource:  basicAlert.Source,
 		Timestamp: basicAlert.Timestamp,
@@ -176,7 +176,7 @@ func (m *SmartAlertManager) GetAlertInsights(ctx context.Context) (*AlertInsight
 }
 
 // analyzeRootCause uses AI to determine root cause
-func (m *SmartAlertManager) analyzeRootCause(ctx context.Context, alert SmartAlert) (string, string) {
+func (m *SmartAlertManager) analyzeRootCause(ctx context.Context, alert IntelligentAlert) (string, string) {
 	// Get recent alerts for context
 	recentAlerts := m.getRecentAlerts(10 * time.Minute)
 
@@ -217,7 +217,7 @@ Be specific and actionable.`,
 }
 
 // calculateNoiseScore determines if alert is noise
-func (m *SmartAlertManager) calculateNoiseScore(alert SmartAlert) float64 {
+func (m *SmartAlertManager) calculateNoiseScore(alert IntelligentAlert) float64 {
 	score := 0.0
 	factors := 0
 
@@ -263,7 +263,7 @@ func (m *SmartAlertManager) calculateNoiseScore(alert SmartAlert) float64 {
 }
 
 // calculatePriority determines alert priority
-func (m *SmartAlertManager) calculatePriority(alert SmartAlert) int {
+func (m *SmartAlertManager) calculatePriority(alert IntelligentAlert) int {
 	priority := 50 // baseline
 
 	// Severity impact
@@ -301,7 +301,7 @@ func (m *SmartAlertManager) calculatePriority(alert SmartAlert) int {
 }
 
 // suggestRemediation provides AI remediation suggestions
-func (m *SmartAlertManager) suggestRemediation(ctx context.Context, alert SmartAlert) (string, string) {
+func (m *SmartAlertManager) suggestRemediation(ctx context.Context, alert IntelligentAlert) (string, string) {
 	prompt := fmt.Sprintf(`Suggest remediation for this alert:
 
 Alert: %s
@@ -343,7 +343,7 @@ Be concise and actionable.`,
 
 // Helper methods
 
-func (m *SmartAlertManager) updateHistory(alert SmartAlert) {
+func (m *SmartAlertManager) updateHistory(alert IntelligentAlert) {
 	m.alertHistory.alerts = append(m.alertHistory.alerts, alert)
 
 	// Trim history
@@ -352,7 +352,7 @@ func (m *SmartAlertManager) updateHistory(alert SmartAlert) {
 	}
 }
 
-func (m *SmartAlertManager) updatePatterns(alert SmartAlert) {
+func (m *SmartAlertManager) updatePatterns(alert IntelligentAlert) {
 	pattern, exists := m.alertHistory.patterns[alert.Name]
 	if !exists {
 		pattern = &AlertPattern{
@@ -374,9 +374,9 @@ func (m *SmartAlertManager) updatePatterns(alert SmartAlert) {
 	pattern.Correlated = alert.Correlation
 }
 
-func (m *SmartAlertManager) getRecentAlerts(window time.Duration) []SmartAlert {
+func (m *SmartAlertManager) getRecentAlerts(window time.Duration) []IntelligentAlert {
 	cutoff := time.Now().Add(-window)
-	recent := []SmartAlert{}
+	recent := []IntelligentAlert{}
 
 	for i := len(m.alertHistory.alerts) - 1; i >= 0; i-- {
 		if m.alertHistory.alerts[i].Timestamp.After(cutoff) {
@@ -389,8 +389,8 @@ func (m *SmartAlertManager) getRecentAlerts(window time.Duration) []SmartAlert {
 	return recent
 }
 
-func (m *SmartAlertManager) findSimilarAlerts(alert SmartAlert, window time.Duration) []SmartAlert {
-	similar := []SmartAlert{}
+func (m *SmartAlertManager) findSimilarAlerts(alert IntelligentAlert, window time.Duration) []IntelligentAlert {
+	similar := []IntelligentAlert{}
 	cutoff := time.Now().Add(-window)
 
 	for _, historical := range m.alertHistory.alerts {
@@ -404,7 +404,7 @@ func (m *SmartAlertManager) findSimilarAlerts(alert SmartAlert, window time.Dura
 	return similar
 }
 
-func (m *SmartAlertManager) isTransientIssue(alert SmartAlert) bool {
+func (m *SmartAlertManager) isTransientIssue(alert IntelligentAlert) bool {
 	transientPatterns := []string{
 		"connection reset",
 		"timeout",
@@ -423,7 +423,7 @@ func (m *SmartAlertManager) isTransientIssue(alert SmartAlert) bool {
 	return false
 }
 
-func (m *SmartAlertManager) canAutoResolve(alert SmartAlert) bool {
+func (m *SmartAlertManager) canAutoResolve(alert IntelligentAlert) bool {
 	// Check if similar alerts auto-resolved
 	similar := m.findSimilarAlerts(alert, 7*24*time.Hour)
 	if len(similar) < 3 {
@@ -530,7 +530,7 @@ func getDefaultSuppressionRules() []SuppressionRule {
 	return []SuppressionRule{
 		{
 			Name: "Duplicate suppression",
-			Condition: func(alert SmartAlert, history []SmartAlert) bool {
+			Condition: func(alert IntelligentAlert, history []IntelligentAlert) bool {
 				// Suppress if same alert fired in last minute
 				for i := len(history) - 1; i >= 0; i-- {
 					if history[i].Name == alert.Name &&
@@ -545,7 +545,7 @@ func getDefaultSuppressionRules() []SuppressionRule {
 		},
 		{
 			Name: "High noise suppression",
-			Condition: func(alert SmartAlert, history []SmartAlert) bool {
+			Condition: func(alert IntelligentAlert, history []IntelligentAlert) bool {
 				return alert.NoiseScore > 0.8
 			},
 			Action: "suppress",
@@ -554,7 +554,7 @@ func getDefaultSuppressionRules() []SuppressionRule {
 }
 
 // NoiseSuppressor methods
-func (n *NoiseSuppressor) shouldSuppress(alert SmartAlert, history []SmartAlert) bool {
+func (n *NoiseSuppressor) shouldSuppress(alert IntelligentAlert, history []IntelligentAlert) bool {
 	// Check rules
 	for _, rule := range n.rules {
 		if rule.Condition(alert, history) {
@@ -572,7 +572,7 @@ func (n *NoiseSuppressor) shouldSuppress(alert SmartAlert, history []SmartAlert)
 }
 
 // AlertCorrelator methods
-func (c *AlertCorrelator) findCorrelations(alert SmartAlert, history []SmartAlert) []string {
+func (c *AlertCorrelator) findCorrelations(alert IntelligentAlert, history []IntelligentAlert) []string {
 	correlated := []string{}
 	cutoff := alert.Timestamp.Add(-c.timeWindow)
 
@@ -587,7 +587,7 @@ func (c *AlertCorrelator) findCorrelations(alert SmartAlert, history []SmartAler
 	return correlated
 }
 
-func (c *AlertCorrelator) areCorrelated(a1, a2 SmartAlert) bool {
+func (c *AlertCorrelator) areCorrelated(a1, a2 IntelligentAlert) bool {
 	// Same resource
 	if a1.Resource == a2.Resource {
 		return true
