@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kubepulse/kubepulse/pkg/alerts"
+	"github.com/kubepulse/kubepulse/pkg/ml"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -355,18 +356,27 @@ func TestErrorPropagation(t *testing.T) {
 	})
 
 	engine := &Engine{
-		client:      client,
-		checks:      make([]HealthCheck, 0),
-		results:     make(map[string]CheckResult),
-		alertChan:   make(chan Alert, 10),
-		metricsChan: make(chan Metric, 10),
-		ctx:         context.Background(),
-		resultsTTL:  24 * time.Hour,
+		client:        client,
+		checks:        make([]HealthCheck, 0),
+		results:       make(map[string]CheckResult),
+		alertChan:     make(chan Alert, 10),
+		metricsChan:   make(chan Metric, 10),
+		ctx:           context.Background(),
+		resultsTTL:    24 * time.Hour,
+		errorHandler:  NewErrorHandler(1000, nil), // Add error handler to prevent nil pointer
+		alertManager:  alerts.NewManager(),        // Add alert manager to prevent nil pointer
+		anomalyEngine: ml.NewAnomalyDetector(),    // Add anomaly engine to prevent nil pointer
 	}
 
 	errorCheck := &MockHealthCheck{
 		name: "error-check",
-		err:  context.DeadlineExceeded,
+		result: CheckResult{
+			Name:      "error-check",
+			Status:    HealthStatusUnknown,
+			Message:   "Check failed",
+			Timestamp: time.Now(),
+		},
+		err: context.DeadlineExceeded,
 	}
 
 	engine.AddCheck(errorCheck)
