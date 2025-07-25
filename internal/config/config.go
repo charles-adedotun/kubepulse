@@ -97,11 +97,11 @@ type MLConfig struct {
 
 // ServerConfig holds server-related configuration
 type ServerConfig struct {
-	Port         int      `yaml:"port" mapstructure:"port"`
-	Host         string   `yaml:"host" mapstructure:"host"`
-	EnableWeb    bool     `yaml:"enable_web" mapstructure:"enable_web"`
-	CORSEnabled  bool     `yaml:"cors_enabled" mapstructure:"cors_enabled"`
-	CORSOrigins  []string `yaml:"cors_origins" mapstructure:"cors_origins"`
+	Port         int           `yaml:"port" mapstructure:"port"`
+	Host         string        `yaml:"host" mapstructure:"host"`
+	EnableWeb    bool          `yaml:"enable_web" mapstructure:"enable_web"`
+	CORSEnabled  bool          `yaml:"cors_enabled" mapstructure:"cors_enabled"`
+	CORSOrigins  []string      `yaml:"cors_origins" mapstructure:"cors_origins"`
 	ReadTimeout  time.Duration `yaml:"read_timeout" mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `yaml:"write_timeout" mapstructure:"write_timeout"`
 }

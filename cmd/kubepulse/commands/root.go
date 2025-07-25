@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	cfgFile       string
-	kubeconfig    string
-	contextName   string
-	k8sClient     kubernetes.Interface
+	cfgFile     string
+	kubeconfig  string
+	contextName string
+	k8sClient   kubernetes.Interface
 )
 
 // rootCmd represents the base command
@@ -102,20 +102,20 @@ func initK8sClient() {
 	// Build config with context override if specified
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	loadingRules.ExplicitPath = kubeconfigPath
-	
+
 	configOverrides := &clientcmd.ConfigOverrides{}
-	
+
 	// Use specified context if provided
 	selectedContext := viper.GetString("context")
 	if selectedContext != "" {
 		configOverrides.CurrentContext = selectedContext
 	}
-	
+
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		loadingRules,
 		configOverrides,
 	)
-	
+
 	config, err := clientConfig.ClientConfig()
 	if err != nil {
 		// Try in-cluster config

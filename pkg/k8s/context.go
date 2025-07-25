@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -86,9 +88,8 @@ func (cm *ContextManager) ListContexts() ([]ContextInfo, error) {
 			info.Server = cluster.Server
 		}
 
-		if authInfo != nil {
-			// Could add more user info if needed
-		}
+		// Note: authInfo could be used to add more user info if needed in the future
+		_ = authInfo
 
 		contexts = append(contexts, info)
 	}
@@ -187,11 +188,12 @@ func (cm *ContextManager) getOrCreateClient(contextName string) (kubernetes.Inte
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
-	// Test the connection
-	ctx, cancel := context.WithTimeout(context.Background(), clientcmd.DefaultTimeout)
+	// Test the connection with 10 second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err = client.ServerVersion()
+	// Use a simple API call to test connectivity
+	_, err = client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{Limit: 1})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to cluster: %w", err)
 	}

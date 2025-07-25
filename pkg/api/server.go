@@ -103,14 +103,14 @@ func NewServer(config Config) *Server {
 				return false
 			},
 		},
-		clients:      make(map[*websocket.Conn]bool),
-		shutdown:     make(chan struct{}),
-		ctx:          ctx,
-		cancel:       cancel,
-		corsEnabled:  config.CORSEnabled,
-		corsOrigins:  config.CORSOrigins,
-		uiConfig:     config.UIConfig,
-}
+		clients:     make(map[*websocket.Conn]bool),
+		shutdown:    make(chan struct{}),
+		ctx:         ctx,
+		cancel:      cancel,
+		corsEnabled: config.CORSEnabled,
+		corsOrigins: config.CORSOrigins,
+		uiConfig:    config.UIConfig,
+	}
 
 	server.setupRoutes()
 
@@ -206,7 +206,7 @@ func (s *Server) handleClusterHealth(w http.ResponseWriter, r *http.Request) {
 			contextName = ctx.Name
 		}
 	}
-	
+
 	clusterName := r.URL.Query().Get("cluster")
 	if clusterName == "" {
 		clusterName = contextName
@@ -302,7 +302,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 				}
 			}
 		}
-		
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -405,6 +405,20 @@ func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+	}
+}
+
+// writeError writes an error response with the given status code and message
+func (s *Server) writeError(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	response := map[string]interface{}{
+		"error":   true,
+		"message": message,
+		"status":  statusCode,
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
 	}
 }
 
@@ -639,9 +653,10 @@ func (s *Server) handleSwitchContext(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update engine with new client
-	// Note: This requires adding a method to update the engine's client
-	// For now, we'll just return success
-	
+	// TODO: This requires adding a method to update the engine's client
+	// For now, we'll just acknowledge the client exists
+	_ = client
+
 	// Get updated context info
 	context, err := s.contextManager.GetCurrentContext()
 	if err != nil {
