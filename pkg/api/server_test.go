@@ -279,7 +279,7 @@ func TestCorsMiddleware_Preflight(t *testing.T) {
 func TestSpaHandler(t *testing.T) {
 	// Create a simple file server for testing
 	fileHandler := http.FileServer(http.Dir("./"))
-	
+
 	spa := spaHandler{
 		handler: fileHandler,
 		path:    "./",
