@@ -11,12 +11,12 @@ export interface Config {
     maxReconnectAttempts: number
     reconnectDelay: number
     theme: 'light' | 'dark' | 'system'
-  }
-  features: {
-    aiInsights: boolean
-    predictiveAnalytics: boolean
-    smartAlerts: boolean
-    nodeDetails: boolean
+    features: {
+      aiInsights: boolean
+      predictiveAnalytics: boolean
+      smartAlerts: boolean
+      nodeDetails: boolean
+    }
   }
 }
 
@@ -52,12 +52,12 @@ function getConfig(): Config {
       maxReconnectAttempts: Number(env.VITE_MAX_RECONNECT_ATTEMPTS) || 5,
       reconnectDelay: Number(env.VITE_RECONNECT_DELAY) || 3000, // 3 seconds
       theme: (env.VITE_THEME as Config['ui']['theme']) || 'system',
-    },
-    features: {
-      aiInsights: env.VITE_FEATURE_AI_INSIGHTS !== 'false',
-      predictiveAnalytics: env.VITE_FEATURE_PREDICTIVE !== 'false',
-      smartAlerts: env.VITE_FEATURE_SMART_ALERTS !== 'false',
-      nodeDetails: env.VITE_FEATURE_NODE_DETAILS !== 'false',
+      features: {
+        aiInsights: env.VITE_FEATURE_AI_INSIGHTS !== 'false',
+        predictiveAnalytics: env.VITE_FEATURE_PREDICTIVE !== 'false',
+        smartAlerts: env.VITE_FEATURE_SMART_ALERTS !== 'false',
+        nodeDetails: env.VITE_FEATURE_NODE_DETAILS !== 'false',
+      },
     },
   }
 }

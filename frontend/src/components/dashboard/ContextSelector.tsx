@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Check, ChevronsUpDown, Globe } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Check, Globe } from 'lucide-react'
 import {
   Select,
   SelectContent,
