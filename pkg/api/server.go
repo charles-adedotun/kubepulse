@@ -408,6 +408,20 @@ func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 	}
 }
 
+// writeError writes an error response with the given status code and message
+func (s *Server) writeError(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	response := map[string]interface{}{
+		"error":   true,
+		"message": message,
+		"status":  statusCode,
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
+	}
+}
+
 // ServeHTTP implements the http.Handler interface for SPA
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get the absolute path to prevent directory traversal
