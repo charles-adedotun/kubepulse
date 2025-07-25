@@ -54,8 +54,112 @@ jobs:
         go vet ./pkg/slo/...
         echo "✅ Go vet passed"
 
-  # TODO: Add Claude Code Review integration once action is available
-  # claude-review:
-  #   name: Claude Code Review
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'pull_request'
+  claude-review:
+    name: Claude Code Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Run Claude Code Review
+      id: claude
+      run: |
+        ./.github/scripts/claude-review.sh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Comment Claude Review
+      uses: actions/github-script@v7
+      if: steps.claude.outputs.CLAUDE_REVIEW
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `${{ steps.claude.outputs.CLAUDE_REVIEW }}`
+          })
+
+  decision-matrix:
+    name: PR Decision Matrix
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: [test, claude-review]
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+        
+    - name: Determine CI Status
+      id: ci-status
+      run: |
+        if [[ "${{ needs.test.result }}" == "success" ]]; then
+          echo "CI_STATUS=success" >> $GITHUB_OUTPUT
+        elif [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "CI_STATUS=failure" >> $GITHUB_OUTPUT
+        else
+          echo "CI_STATUS=warning" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Run Decision Matrix
+      id: decision
+      run: |
+        ./.github/scripts/pr-decision-matrix.sh "${{ steps.ci-status.outputs.CI_STATUS }}" "${{ needs.claude-review.outputs.REVIEW_DECISION }}"
+        
+    - name: Apply Decision
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const decision = '${{ steps.decision.outputs.DECISION }}';
+          const autoMerge = '${{ steps.decision.outputs.AUTO_MERGE }}' === 'true';
+          const blockMerge = '${{ steps.decision.outputs.BLOCK_MERGE }}' === 'true';
+          
+          // Add decision comment
+          const decisionComment = `## 🎯 PR Decision Matrix Result: \`${decision.toUpperCase()}\`
+          
+          **Analysis:**
+          - CI Status: ${{ steps.ci-status.outputs.CI_STATUS }}
+          - Claude Review: ${{ needs.claude-review.outputs.REVIEW_DECISION }}
+          - Auto Merge: ${autoMerge ? '✅' : '❌'}
+          - Manual Review Required: ${{ steps.decision.outputs.MANUAL_REVIEW === 'true' ? '✅' : '❌' }}
+          - Merge Blocked: ${blockMerge ? '⚠️' : '✅'}
+          
+          ${autoMerge ? '🚀 **This PR will be auto-merged**' : ''}
+          ${blockMerge ? '🚫 **This PR requires fixes before merging**' : ''}
+          `;
+          
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: decisionComment
+          });
+          
+          // Auto-merge if decision allows it
+          if (autoMerge) {
+            console.log('🚀 Auto-merging PR...');
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                commit_title: 'Auto-merge: Passed all checks and Claude review',
+                merge_method: 'squash'
+              });
+              console.log('✅ PR auto-merged successfully');
+            } catch (error) {
+              console.log('❌ Auto-merge failed:', error.message);
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '⚠️ Auto-merge was approved but failed. Manual merge required.'
+              });
+            }
+          }
