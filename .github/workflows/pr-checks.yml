@@ -34,7 +34,7 @@ jobs:
         echo "Checking PR title: $PR_TITLE"
         
         # Check for conventional commit format
-        if [[ ! "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+ ]]; then
+        if ! echo "$PR_TITLE" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+'; then
           echo "❌ PR title does not follow conventional commit format"
           echo "Expected format: type(scope): description"
           echo "Example: feat(ai): add predictive analytics"
@@ -49,7 +49,7 @@ jobs:
         INVALID_COMMITS=""
         
         while IFS= read -r commit; do
-          if [[ ! "$commit" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+ ]]; then
+          if ! echo "$commit" | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+'; then
             INVALID_COMMITS="$INVALID_COMMITS\n- $commit"
           fi
         done <<< "$COMMITS"
