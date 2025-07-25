@@ -1,0 +1,83 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly security scans on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # For uploading SARIF results
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+        
+    - name: Run Gosec Security Scanner
+      run: |
+        echo "🔍 Running Gosec security scanner..."
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        gosec -fmt sarif -out gosec-results.sarif ./...
+        
+    - name: Upload Gosec results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'gosec-results.sarif'
+        
+    - name: Run Nancy vulnerability check
+      run: |
+        echo "🔍 Running Nancy vulnerability check..."
+        # Install nancy
+        go install github.com/sonatypecommunity/nancy@latest
+        go list -json -deps ./... | nancy sleuth || echo "Nancy scan completed with warnings"
+        
+    - name: Run govulncheck
+      run: |
+        echo "🔍 Running govulncheck..."
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+        
+    - name: Run staticcheck
+      uses: dominikh/staticcheck-action@v1
+      with:
+        version: "latest"
+        install-go: false
+        cache-key: ${{ github.run_id }}
+        
+    - name: Run ineffassign
+      run: |
+        echo "🔍 Running ineffassign..."
+        go install github.com/gordonklaus/ineffassign@latest
+        ineffassign ./...
+        
+    - name: Run misspell
+      run: |
+        echo "🔍 Running misspell check..."
+        go install github.com/client9/misspell/cmd/misspell@latest
+        misspell -error $(find . -type f -name "*.go" | grep -v vendor/)
+        
+    - name: Security scan summary
+      run: |
+        echo "✅ Security scan completed"
+        echo "📊 Scan results:"
+        echo "  - Gosec: Static security analysis"
+        echo "  - Nancy: Dependency vulnerability check" 
+        echo "  - govulncheck: Go vulnerability database check"
+        echo "  - staticcheck: Static analysis"
+        echo "  - ineffassign: Ineffectual assignments"
+        echo "  - misspell: Spelling errors"

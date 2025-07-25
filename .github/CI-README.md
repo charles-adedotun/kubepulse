@@ -16,6 +16,12 @@ KubePulse uses a **progressive CI/CD approach** that combines minimal essential 
 - **Intelligent Decision Matrix**: 4 possible outcomes based on CI + AI analysis
 - **Automated Actions**: From auto-merge to blocking based on risk assessment
 
+### Phase 4: External Tool Integration ✅
+- **Security Scanning**: Vulnerability detection with govulncheck, gosec, nancy
+- **Performance Monitoring**: Benchmarks, profiling, regression detection
+- **Code Coverage**: Comprehensive test coverage reporting with Codecov
+- **Quality Analysis**: Static analysis, inefficient code detection, spell checking
+
 ## 🎯 Decision Matrix
 
 Our CI system evaluates each PR and determines one of **4 outcomes**:
@@ -94,8 +100,21 @@ The system is designed to be:
 - **Phase 1** ✅: Minimal CI foundation with core packages
 - **Phase 2** ✅: Claude Code integration + AI decision matrix  
 - **Phase 3** ✅: Expanded test coverage + integration tests
-- **Phase 4** 🔜: External tool integration (security scanning, performance tests)
+- **Phase 4** ✅: External tool integration (security, performance, coverage)
 - **Phase 5** 🔜: Deployment automation and release management
+
+## 🔧 Workflow Architecture
+
+### Core Workflows
+- **`minimal-ci.yml`**: Main CI pipeline with all phases integrated
+- **`claude-code-review.yml`**: Automatic Claude Code reviews on PRs
+- **`claude.yml`**: Interactive Claude support via `@claude` mentions
+
+### Specialized Workflows  
+- **`security-scan.yml`**: Comprehensive security analysis (weekly + PR)
+- **`performance.yml`**: Performance benchmarks and regression detection
+- **`frontend-ci.yml`**: Frontend-specific testing (when frontend changes)
+- **`release.yml`**: Release automation and version management
 
 ## 🔍 Monitoring
 

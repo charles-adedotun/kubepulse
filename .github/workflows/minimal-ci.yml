@@ -67,6 +67,47 @@ jobs:
         go vet ./pkg/storage/...
         go vet ./pkg/web/...
         echo "✅ Go vet passed for all packages"
+        
+    - name: Security vulnerability scan
+      run: |
+        echo "🔍 Running security vulnerability scan..."
+        # Install govulncheck
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+        echo "✅ Vulnerability scan completed"
+        
+    - name: Generate test coverage
+      run: |
+        echo "📊 Generating test coverage report..."
+        # Run tests with coverage for packages that have tests
+        go test -race -coverprofile=coverage.out -covermode=atomic ./test/integration/...
+        
+        # Generate coverage report
+        go tool cover -html=coverage.out -o coverage.html
+        
+        # Show coverage summary
+        go tool cover -func=coverage.out
+        echo "✅ Coverage report generated"
+        
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-kubepulse
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+        
+    - name: Performance benchmarks
+      run: |
+        echo "⚡ Running performance benchmarks..."
+        # Run benchmarks for packages that have them
+        if go test -bench=. -benchmem ./test/integration/... 2>/dev/null | grep -q "Benchmark"; then
+          go test -bench=. -benchmem ./test/integration/...
+        else
+          echo "No benchmark tests found, skipping..."
+        fi
+        echo "✅ Benchmark analysis completed"
 
   claude-review:
     name: Claude Code Review

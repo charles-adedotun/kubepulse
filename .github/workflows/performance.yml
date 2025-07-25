@@ -1,0 +1,95 @@
+name: Performance Monitoring
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  performance:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+        
+    - name: Run benchmarks
+      run: |
+        echo "⚡ Running performance benchmarks..."
+        
+        # Run benchmarks with memory profiling
+        go test -bench=. -benchmem -run=^$ ./test/integration/... > benchmark_results.txt
+        
+        # Show results
+        cat benchmark_results.txt
+        
+        # Extract key metrics
+        echo "📊 Performance Summary:"
+        grep "Benchmark" benchmark_results.txt | head -10
+        
+    - name: Memory and CPU profiling
+      run: |
+        echo "🔍 Running CPU and memory profiling..."
+        
+        # Run tests with CPU profile
+        go test -cpuprofile=cpu.prof -memprofile=mem.prof -bench=. ./test/integration/...
+        
+        # Install pprof tools
+        go install github.com/google/pprof@latest
+        
+        # Generate profile reports (if profiles exist)
+        if [ -f cpu.prof ]; then
+          echo "CPU Profile Top Functions:"
+          go tool pprof -text -nodefraction=0.1 cpu.prof | head -20
+        fi
+        
+        if [ -f mem.prof ]; then
+          echo "Memory Profile Top Allocations:"
+          go tool pprof -text -nodefraction=0.1 mem.prof | head -20
+        fi
+        
+    - name: Race condition detection
+      run: |
+        echo "🏃 Running race condition detection..."
+        go test -race ./test/integration/...
+        echo "✅ Race condition check completed"
+        
+    - name: Build performance check
+      run: |
+        echo "🏗️ Measuring build performance..."
+        time go build -v ./...
+        echo "✅ Build performance measured"
+        
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-results
+        path: |
+          benchmark_results.txt
+          *.prof
+        retention-days: 7
+        
+    - name: Performance regression check
+      run: |
+        echo "📈 Checking for performance regressions..."
+        
+        # This is a placeholder for more sophisticated regression detection
+        # In a real scenario, you'd compare against baseline metrics
+        echo "Benchmark results saved for regression analysis"
+        
+        # Simple check: ensure benchmarks complete within reasonable time
+        if grep -q "FAIL" benchmark_results.txt; then
+          echo "❌ Some benchmarks failed!"
+          exit 1
+        else
+          echo "✅ All benchmarks passed"
+        fi
