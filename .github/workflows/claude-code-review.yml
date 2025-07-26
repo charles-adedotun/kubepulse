@@ -8,7 +8,7 @@ jobs:
   claude-review:
     runs-on: ubuntu-latest
     # Skip bot PRs
-    if: ${{ \!contains(github.actor, 'bot') && \!contains(github.actor, 'dependabot') }}
+    if: ${{ !contains(github.actor, 'bot') && !contains(github.actor, 'dependabot') }}
     
     permissions:
       contents: read
