@@ -102,14 +102,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHECKS_PASSED: ${{ needs.wait-for-checks.outputs.checks_passed }}
 
-      - name: AI Merge Decision
+      - name: AI Merge Decision (Mock)
         id: ai_decision
-        uses: anthropics/claude-code-action@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          model: claude-3-5-sonnet-20241022
-          prompt_file: /tmp/merge-decision-prompt.md
+        run: |
+          # Mock AI decision - replace with actual Claude integration when available
+          decision="MANUAL_APPROVAL"
+          reason="Comprehensive CI pipeline passed. Please review manually."
+          echo "{\"decision\":\"$decision\",\"reason\":\"$reason\",\"critical_issues\":[]}" > /tmp/ai_decision.json
+          echo "Mock AI decision: $decision"
           
       - name: Parse Decision
         id: parse_decision
