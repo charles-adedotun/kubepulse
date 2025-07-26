@@ -59,7 +59,7 @@ func (k *KubectlExecutor) Execute(ctx context.Context, command string) (string, 
 func (k *KubectlExecutor) parseAndValidateCommand(command string) ([]string, error) {
 	// Remove leading/trailing whitespace
 	command = strings.TrimSpace(command)
-	
+
 	// Ensure command starts with kubectl
 	if !strings.HasPrefix(command, "kubectl") {
 		return nil, fmt.Errorf("only kubectl commands are supported")
@@ -95,7 +95,7 @@ func (k *KubectlExecutor) validateArgument(arg string) error {
 	dangerousPatterns := []string{
 		";", "&", "|", "$(", "`", ">", "<", "&&", "||", "\\",
 	}
-	
+
 	for _, pattern := range dangerousPatterns {
 		if strings.Contains(arg, pattern) {
 			return fmt.Errorf("contains dangerous pattern: %s", pattern)
