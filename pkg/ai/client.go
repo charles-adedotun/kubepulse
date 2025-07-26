@@ -185,14 +185,26 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	if c.testMode {
 		klog.Infof("AI: Test mode enabled, returning mock response")
 		return `{
-			"analysis": "Mock analysis response for testing",
+			"summary": "Mock analysis response for testing",
+			"diagnosis": "Mock diagnosis for testing",
 			"confidence": 0.8,
 			"severity": "medium",
-			"recommendations": ["Mock recommendation 1", "Mock recommendation 2"],
-			"actions": ["Mock action 1"],
-			"commands": [],
-			"references": [],
-			"followup_questions": []
+			"recommendations": [
+				{
+					"title": "Mock recommendation 1",
+					"description": "Mock description 1",
+					"priority": "high",
+					"references": []
+				}
+			],
+			"actions": [
+				{
+					"description": "Mock action 1",
+					"command": "kubectl get pods",
+					"priority": "high"
+				}
+			],
+			"context": {}
 		}`, nil
 	}
 

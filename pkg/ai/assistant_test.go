@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -573,46 +574,81 @@ func TestHandlerStructures(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	
-	// Test that handlers don't panic and structure requests properly
+	// Test that handlers work properly with mock responses
 	testCases := []struct {
-		name string
-		fn   func() error
+		name     string
+		fn       func() (*QueryResponse, error)
+		validate func(*QueryResponse) error
 	}{
 		{
 			name: "performance query handler",
-			fn: func() error {
-				_, err := assistant.handlePerformanceQuery(ctx, "Why is it slow?", health)
-				return err // Expected to fail due to missing claude CLI, but shouldn't panic
+			fn: func() (*QueryResponse, error) {
+				return assistant.handlePerformanceQuery(ctx, "Why is it slow?", health)
+			},
+			validate: func(resp *QueryResponse) error {
+				if resp.Answer == "" {
+					return fmt.Errorf("expected non-empty answer")
+				}
+				if resp.Confidence <= 0 {
+					return fmt.Errorf("expected positive confidence, got %f", resp.Confidence)
+				}
+				return nil
 			},
 		},
 		{
 			name: "troubleshooting query handler",
-			fn: func() error {
-				_, err := assistant.handleTroubleshootingQuery(ctx, "What's broken?", health)
-				return err // Expected to fail due to missing claude CLI, but shouldn't panic
+			fn: func() (*QueryResponse, error) {
+				return assistant.handleTroubleshootingQuery(ctx, "What's broken?", health)
+			},
+			validate: func(resp *QueryResponse) error {
+				if resp.Answer == "" {
+					return fmt.Errorf("expected non-empty answer")
+				}
+				if resp.Confidence <= 0 {
+					return fmt.Errorf("expected positive confidence, got %f", resp.Confidence)
+				}
+				return nil
 			},
 		},
 		{
 			name: "optimization query handler",
-			fn: func() error {
-				_, err := assistant.handleOptimizationQuery(ctx, "How to optimize?", health)
-				return err // Expected to fail due to missing claude CLI, but shouldn't panic
+			fn: func() (*QueryResponse, error) {
+				return assistant.handleOptimizationQuery(ctx, "How to optimize?", health)
+			},
+			validate: func(resp *QueryResponse) error {
+				if resp.Answer == "" {
+					return fmt.Errorf("expected non-empty answer")
+				}
+				if resp.Confidence <= 0 {
+					return fmt.Errorf("expected positive confidence, got %f", resp.Confidence)
+				}
+				return nil
 			},
 		},
 	}
 	
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// We expect errors due to missing claude CLI, but no panics
+			// Test that handlers don't panic and return valid responses in test mode
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("handler %s panicked: %v", tc.name, r)
 				}
 			}()
 			
-			err := tc.fn()
-			if err == nil {
-				t.Errorf("expected error from %s due to missing claude CLI", tc.name)
+			resp, err := tc.fn()
+			if err != nil {
+				t.Errorf("unexpected error from %s: %v", tc.name, err)
+				return
+			}
+			
+			if resp == nil {
+				t.Errorf("expected response from %s, got nil", tc.name)
+				return
+			}
+			
+			if validateErr := tc.validate(resp); validateErr != nil {
+				t.Errorf("response validation failed for %s: %v", tc.name, validateErr)
 			}
 		})
 	}

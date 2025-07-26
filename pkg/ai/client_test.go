@@ -306,17 +306,31 @@ func TestAnalyzeDiagnostic(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	
-	// This will fail since we don't have claude CLI, but we test the structure
-	_, err := client.AnalyzeDiagnostic(ctx, checkResult, diagnosticContext)
+	// In test mode, this should return a successful mock response
+	response, err := client.AnalyzeDiagnostic(ctx, checkResult, diagnosticContext)
 	
-	// We expect an error since claude CLI isn't available in test environment
-	if err == nil {
-		t.Error("expected error due to missing claude CLI, but got none")
+	// We expect success in test mode with mock responses
+	if err != nil {
+		t.Errorf("unexpected error in test mode: %v", err)
+		return
 	}
 	
-	// Verify the error is related to claude execution, not parameter validation
-	if !strings.Contains(err.Error(), "claude") {
-		t.Errorf("expected claude-related error, got: %v", err)
+	if response == nil {
+		t.Error("expected response in test mode, got nil")
+		return
+	}
+	
+	// Validate mock response structure
+	if response.Summary == "" {
+		t.Error("expected non-empty summary in mock response")
+	}
+	
+	if response.Confidence <= 0 {
+		t.Errorf("expected positive confidence in mock response, got %f", response.Confidence)
+	}
+	
+	if response.Severity == "" {
+		t.Error("expected non-empty severity in mock response")
 	}
 }
 
@@ -338,17 +352,31 @@ func TestAnalyzeHealing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	
-	// This will fail since we don't have claude CLI, but we test the structure
-	_, err := client.AnalyzeHealing(ctx, checkResult, diagnosticContext)
+	// In test mode, this should return a successful mock response
+	response, err := client.AnalyzeHealing(ctx, checkResult, diagnosticContext)
 	
-	// We expect an error since claude CLI isn't available in test environment
-	if err == nil {
-		t.Error("expected error due to missing claude CLI, but got none")
+	// We expect success in test mode with mock responses
+	if err != nil {
+		t.Errorf("unexpected error in test mode: %v", err)
+		return
 	}
 	
-	// Verify the error is related to claude execution, not parameter validation
-	if !strings.Contains(err.Error(), "claude") {
-		t.Errorf("expected claude-related error, got: %v", err)
+	if response == nil {
+		t.Error("expected response in test mode, got nil")
+		return
+	}
+	
+	// Validate mock response structure
+	if response.Summary == "" {
+		t.Error("expected non-empty summary in mock response")
+	}
+	
+	if response.Confidence <= 0 {
+		t.Errorf("expected positive confidence in mock response, got %f", response.Confidence)
+	}
+	
+	if response.Severity == "" {
+		t.Error("expected non-empty severity in mock response")
 	}
 }
 
@@ -372,17 +400,31 @@ func TestAnalyzeCluster(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	
-	// This will fail since we don't have claude CLI, but we test the structure
-	_, err := client.AnalyzeCluster(ctx, clusterHealth)
+	// In test mode, this should return a successful mock response
+	response, err := client.AnalyzeCluster(ctx, clusterHealth)
 	
-	// We expect an error since claude CLI isn't available in test environment
-	if err == nil {
-		t.Error("expected error due to missing claude CLI, but got none")
+	// We expect success in test mode with mock responses
+	if err != nil {
+		t.Errorf("unexpected error in test mode: %v", err)
+		return
 	}
 	
-	// Verify the error is related to claude execution, not parameter validation
-	if !strings.Contains(err.Error(), "claude") {
-		t.Errorf("expected claude-related error, got: %v", err)
+	if response == nil {
+		t.Error("expected response in test mode, got nil")
+		return
+	}
+	
+	// Validate mock response structure for InsightSummary
+	if response.OverallHealth == "" {
+		t.Error("expected non-empty overall health in mock response")
+	}
+	
+	if response.AIConfidence <= 0 {
+		t.Errorf("expected positive AI confidence in mock response, got %f", response.AIConfidence)
+	}
+	
+	if response.HealthScore <= 0 {
+		t.Errorf("expected positive health score in mock response, got %f", response.HealthScore)
 	}
 }
 
