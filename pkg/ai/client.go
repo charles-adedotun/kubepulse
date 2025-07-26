@@ -19,6 +19,7 @@ type Client struct {
 	maxTurns       int
 	timeout        time.Duration
 	systemPrompt   string
+	testMode       bool
 	circuitBreaker *CircuitBreaker
 	parser         *ResponseParser
 }
@@ -29,6 +30,7 @@ type Config struct {
 	MaxTurns     int
 	Timeout      time.Duration
 	SystemPrompt string
+	TestMode     bool // When true, returns mock responses instead of executing Claude CLI
 }
 
 // NewClient creates a new AI client
@@ -61,6 +63,7 @@ func NewClient(config Config) *Client {
 		maxTurns:       config.MaxTurns,
 		timeout:        config.Timeout,
 		systemPrompt:   config.SystemPrompt,
+		testMode:       config.TestMode,
 		circuitBreaker: circuitBreaker,
 		parser:         NewResponseParser(),
 	}
@@ -177,6 +180,21 @@ func (c *Client) AnalyzeCluster(ctx context.Context, clusterHealth *ClusterHealt
 func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+
+	// Return mock response in test mode
+	if c.testMode {
+		klog.Infof("AI: Test mode enabled, returning mock response")
+		return `{
+			"analysis": "Mock analysis response for testing",
+			"confidence": 0.8,
+			"severity": "medium",
+			"recommendations": ["Mock recommendation 1", "Mock recommendation 2"],
+			"actions": ["Mock action 1"],
+			"commands": [],
+			"references": [],
+			"followup_questions": []
+		}`, nil
+	}
 
 	// Validate Claude path for security
 	if err := c.validateClaudePath(); err != nil {

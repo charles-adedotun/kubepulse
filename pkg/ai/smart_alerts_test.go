@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewSmartAlertManager(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	if manager == nil {
@@ -68,7 +68,7 @@ func TestNewSmartAlertManager(t *testing.T) {
 }
 
 func TestCalculateNoiseScore(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	tests := []struct {
@@ -140,7 +140,7 @@ func TestCalculateNoiseScore(t *testing.T) {
 }
 
 func TestCalculatePriority(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	tests := []struct {
@@ -299,7 +299,7 @@ func TestIsTransientIssue(t *testing.T) {
 }
 
 func TestCanAutoResolve(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	alert := SmartAlert{
@@ -348,7 +348,7 @@ func TestCanAutoResolve(t *testing.T) {
 }
 
 func TestUpdateHistory(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	alert := SmartAlert{
@@ -387,7 +387,7 @@ func TestUpdateHistory(t *testing.T) {
 }
 
 func TestUpdatePatterns(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	now := time.Now()
@@ -439,7 +439,7 @@ func TestUpdatePatterns(t *testing.T) {
 }
 
 func TestGetRecentAlerts(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	now := time.Now()
@@ -452,9 +452,7 @@ func TestGetRecentAlerts(t *testing.T) {
 		{ID: "very-recent", Timestamp: now.Add(-1 * time.Minute)},
 	}
 	
-	for _, alert := range alerts {
-		manager.alertHistory.alerts = append(manager.alertHistory.alerts, alert)
-	}
+	manager.alertHistory.alerts = append(manager.alertHistory.alerts, alerts...)
 	
 	// Get alerts from last 15 minutes
 	recent := manager.getRecentAlerts(15 * time.Minute)
@@ -474,7 +472,7 @@ func TestGetRecentAlerts(t *testing.T) {
 }
 
 func TestFindSimilarAlerts(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	now := time.Now()
@@ -492,9 +490,7 @@ func TestFindSimilarAlerts(t *testing.T) {
 		{Name: "test-alert", Resource: "test-resource", Timestamp: now.Add(-1 * time.Minute)},  // Similar
 	}
 	
-	for _, alert := range alerts {
-		manager.alertHistory.alerts = append(manager.alertHistory.alerts, alert)
-	}
+	manager.alertHistory.alerts = append(manager.alertHistory.alerts, alerts...)
 	
 	similar := manager.findSimilarAlerts(target, 30*time.Minute)
 	
@@ -515,7 +511,7 @@ func TestFindSimilarAlerts(t *testing.T) {
 }
 
 func TestIdentifyPatterns(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	// Add patterns with different occurrence counts
@@ -556,7 +552,7 @@ func TestIdentifyPatterns(t *testing.T) {
 }
 
 func TestPredictFutureAlerts(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	predictions := manager.predictFutureAlerts(context.Background())
@@ -586,7 +582,7 @@ func TestPredictFutureAlerts(t *testing.T) {
 }
 
 func TestGenerateRecommendations(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	patterns := []AlertPattern{
@@ -621,7 +617,7 @@ func TestGenerateRecommendations(t *testing.T) {
 }
 
 func TestCalculateNoiseReduction(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	// Test with no alerts
@@ -639,9 +635,7 @@ func TestCalculateNoiseReduction(t *testing.T) {
 		{Suppressed: false, Timestamp: now.Add(-5 * time.Minute)},
 	}
 	
-	for _, alert := range alerts {
-		manager.alertHistory.alerts = append(manager.alertHistory.alerts, alert)
-	}
+	manager.alertHistory.alerts = append(manager.alertHistory.alerts, alerts...)
 	
 	reduction = manager.calculateNoiseReduction()
 	expected := 0.5 // 2 out of 4 alerts suppressed
@@ -651,7 +645,7 @@ func TestCalculateNoiseReduction(t *testing.T) {
 }
 
 func TestGetAlertVolumeStats(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	manager := NewSmartAlertManager(client)
 	
 	// Add alerts with different severities
@@ -665,9 +659,7 @@ func TestGetAlertVolumeStats(t *testing.T) {
 		{Severity: "info", Timestamp: now.Add(-2 * time.Minute)},
 	}
 	
-	for _, alert := range alerts {
-		manager.alertHistory.alerts = append(manager.alertHistory.alerts, alert)
-	}
+	manager.alertHistory.alerts = append(manager.alertHistory.alerts, alerts...)
 	
 	stats := manager.getAlertVolumeStats()
 	

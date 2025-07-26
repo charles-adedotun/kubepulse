@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewAssistant(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	assistant := NewAssistant(client)
 	
 	if assistant == nil {
@@ -405,7 +405,7 @@ func TestExtractMetrics(t *testing.T) {
 }
 
 func TestLearnFromFeedback(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	assistant := NewAssistant(client)
 	
 	query := "How to fix pod crashes?"
@@ -449,7 +449,7 @@ func TestLearnFromFeedback(t *testing.T) {
 }
 
 func TestUpdateContext(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	assistant := NewAssistant(client)
 	
 	key := "cluster_version"
@@ -554,7 +554,7 @@ func TestQueryResponseStructure(t *testing.T) {
 
 // Test specialized query handlers with mock data
 func TestHandlerStructures(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	assistant := NewAssistant(client)
 	
 	health := &ClusterHealth{

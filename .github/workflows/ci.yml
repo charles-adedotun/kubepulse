@@ -72,7 +72,7 @@ jobs:
         retention-days: 7
 
     - name: Run Benchmarks
-      run: go test -bench=. -benchmem ./...
+      run: go test -bench=. -benchmem -run=^$ ./...
 
   test-frontend:
     name: Frontend Tests
@@ -314,7 +314,7 @@ jobs:
         echo "Running benchmarks on current PR branch..."
         echo "Current branch: $(git branch --show-current)"
         echo "Current commit: $(git rev-parse HEAD)"
-        go test -bench=. -benchmem -count=5 ./... > current_bench.txt
+        go test -bench=. -benchmem -count=5 -run=^$ ./... > current_bench.txt
         echo "Current benchmarks completed"
 
     - name: Run Baseline Benchmarks (main branch)
@@ -324,7 +324,7 @@ jobs:
         git checkout origin/main
         echo "Running baseline benchmarks on main branch..."
         echo "Current commit: $(git rev-parse HEAD)"
-        go test -bench=. -benchmem -count=5 ./... > baseline_bench.txt
+        go test -bench=. -benchmem -count=5 -run=^$ ./... > baseline_bench.txt
         echo "Baseline benchmarks completed"
         
         # Switch back to PR branch for comparison

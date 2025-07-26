@@ -15,7 +15,7 @@ func TestNewClient(t *testing.T) {
 	}{
 		{
 			name:   "default config",
-			config: Config{},
+			config: Config{TestMode: true},
 			verify: func(c *Client) error {
 				if c.claudePath != "claude" {
 					t.Errorf("expected default claudePath 'claude', got %s", c.claudePath)
@@ -45,6 +45,7 @@ func TestNewClient(t *testing.T) {
 				MaxTurns:     5,
 				Timeout:      60 * time.Second,
 				SystemPrompt: "Custom prompt",
+				TestMode:     true,
 			},
 			verify: func(c *Client) error {
 				if c.claudePath != "/custom/path/claude" {
@@ -288,7 +289,7 @@ func TestBuildPrompt(t *testing.T) {
 }
 
 func TestAnalyzeDiagnostic(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	
 	checkResult := &CheckResult{
 		Name:    "test-check",
@@ -320,7 +321,7 @@ func TestAnalyzeDiagnostic(t *testing.T) {
 }
 
 func TestAnalyzeHealing(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	
 	checkResult := &CheckResult{
 		Name:    "test-check",
@@ -352,7 +353,7 @@ func TestAnalyzeHealing(t *testing.T) {
 }
 
 func TestAnalyzeCluster(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	
 	clusterHealth := &ClusterHealth{
 		ClusterName: "test-cluster",
@@ -445,7 +446,7 @@ func TestCountCriticalIssues(t *testing.T) {
 }
 
 func TestGetCircuitBreakerStats(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	
 	stats := client.GetCircuitBreakerStats()
 	
@@ -460,7 +461,7 @@ func TestGetCircuitBreakerStats(t *testing.T) {
 }
 
 func TestResetCircuitBreaker(t *testing.T) {
-	client := NewClient(Config{})
+	client := NewClient(Config{TestMode: true})
 	
 	// This should not panic
 	client.ResetCircuitBreaker()

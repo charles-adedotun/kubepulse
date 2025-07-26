@@ -74,7 +74,7 @@ func TestAssistantQueryValidation(t *testing.T) {
 				if str, ok := tt.body.(string); ok {
 					body.WriteString(str)
 				} else {
-					json.NewEncoder(&body).Encode(tt.body)
+					_ = json.NewEncoder(&body).Encode(tt.body)
 				}
 			}
 			
@@ -148,7 +148,7 @@ func TestExecuteRemediationValidation(t *testing.T) {
 				if str, ok := tt.body.(string); ok {
 					body.WriteString(str)
 				} else {
-					json.NewEncoder(&body).Encode(tt.body)
+					_ = json.NewEncoder(&body).Encode(tt.body)
 				}
 			}
 			
