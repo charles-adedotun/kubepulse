@@ -65,7 +65,7 @@ func (s *Server) HandlePredictiveInsights(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
 		return
 	}
-	
+
 	insights, err := s.engine.GetPredictiveInsights()
 	if err != nil {
 		klog.Errorf("Failed to get predictive insights: %v", err)
@@ -154,7 +154,7 @@ func (s *Server) HandleSmartAlerts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
 		return
 	}
-	
+
 	insights, err := s.engine.GetSmartAlertInsights()
 	if err != nil {
 		klog.Errorf("Failed to get smart alert insights: %v", err)
