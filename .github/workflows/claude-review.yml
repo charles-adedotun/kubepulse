@@ -1,0 +1,90 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-review:
+    name: Claude Review
+    runs-on: ubuntu-latest
+    # Skip bot PRs and only run on PRs or @claude mentions
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.user.type != 'Bot') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Run Claude Code Review
+      uses: anthropics/claude-code-action@e26577a930883943cf9d90885cd1e8da510078dd # beta
+      with:
+        claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        
+        # Use sticky comments for consistency
+        use_sticky_comment: true
+        
+        # KubePulse-specific context for Claude
+        custom_instructions: |
+          You are reviewing code for KubePulse, a Kubernetes health monitoring tool with ML-powered anomaly detection.
+          
+          **Tech Stack**: Go backend, React/TypeScript frontend, Kubernetes integration
+          **Focus Areas**: Go best practices, Kubernetes monitoring patterns, security, performance, testing
+          
+          **Review Priorities**:
+          1. Security vulnerabilities and proper error handling
+          2. Kubernetes API usage and RBAC considerations  
+          3. Performance implications for monitoring workloads
+          4. Code quality and maintainability
+          5. Test coverage and quality
+          
+          **Review Format**:
+          Provide a structured review with:
+          - Overall assessment (APPROVE/REQUEST_CHANGES/COMMENT)
+          - Key findings and concerns
+          - Specific recommendations
+          - Security considerations
+          
+          Keep feedback constructive and actionable.
+
+        # For direct reviews on PRs, use a comprehensive prompt
+        direct_prompt: |
+          Please review this pull request for KubePulse and provide feedback on:
+          
+          **Code Quality**: Best practices, maintainability, patterns
+          **Security**: Vulnerabilities, authentication, authorization
+          **Performance**: Efficiency, resource usage, scalability  
+          **Testing**: Coverage, quality, integration tests
+          **Kubernetes**: Proper API usage, monitoring patterns, RBAC
+          
+          **Format your review as:**
+          
+          ## Code Review Summary
+          
+          **Overall Assessment**: [APPROVE/REQUEST_CHANGES/COMMENT]
+          
+          **Key Findings:**
+          - [List main points]
+          
+          **Security Review:**
+          - [Security considerations]
+          
+          **Recommendations:**
+          - [Specific actionable items]
+          
+          ## Detailed Analysis
+          [Provide detailed feedback on specific files/changes]
+          
+          ## Final Decision
+          [Your recommendation with clear reasoning]
