@@ -41,6 +41,11 @@ func (s *Server) HandleAssistantQuery(w http.ResponseWriter, r *http.Request) {
 
 	klog.V(2).Infof("Processing assistant query: %s", req.Query)
 
+	if s.engine == nil {
+		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
+		return
+	}
+
 	response, err := s.engine.QueryAssistant(req.Query)
 	if err != nil {
 		klog.Errorf("Assistant query failed: %v", err)
@@ -56,6 +61,11 @@ func (s *Server) HandleAssistantQuery(w http.ResponseWriter, r *http.Request) {
 
 // HandlePredictiveInsights returns AI predictions
 func (s *Server) HandlePredictiveInsights(w http.ResponseWriter, r *http.Request) {
+	if s.engine == nil {
+		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
+		return
+	}
+	
 	insights, err := s.engine.GetPredictiveInsights()
 	if err != nil {
 		klog.Errorf("Failed to get predictive insights: %v", err)
@@ -79,6 +89,11 @@ func (s *Server) HandleRemediationSuggestions(w http.ResponseWriter, r *http.Req
 
 	if checkName == "" {
 		http.Error(w, "Check name is required", http.StatusBadRequest)
+		return
+	}
+
+	if s.engine == nil {
+		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
 		return
 	}
 
@@ -115,6 +130,11 @@ func (s *Server) HandleExecuteRemediation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if s.engine == nil {
+		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
+		return
+	}
+
 	record, err := s.engine.ExecuteRemediation(req.ActionID, req.DryRun)
 	if err != nil {
 		klog.Errorf("Remediation execution failed: %v", err)
@@ -130,6 +150,11 @@ func (s *Server) HandleExecuteRemediation(w http.ResponseWriter, r *http.Request
 
 // HandleSmartAlerts returns intelligent alert insights
 func (s *Server) HandleSmartAlerts(w http.ResponseWriter, r *http.Request) {
+	if s.engine == nil {
+		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
+		return
+	}
+	
 	insights, err := s.engine.GetSmartAlertInsights()
 	if err != nil {
 		klog.Errorf("Failed to get smart alert insights: %v", err)
