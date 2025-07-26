@@ -38,7 +38,7 @@ jobs:
         
         # Install gosec with explicit binary path handling
         echo "Installing gosec..."
-        GOPROXY=proxy.golang.org,direct go install github.com/securego/gosec/v2/cmd/gosec@latest
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
         
         # Verify installation with multiple fallback methods
         GOSEC_BINARY=""
@@ -104,7 +104,7 @@ jobs:
         
         # Install nancy using go install with error handling
         echo "Installing Nancy..."
-        if GOPROXY=proxy.golang.org,direct go install github.com/sonatype-nexus-community/nancy@latest; then
+        if go install github.com/sonatype-nexus-community/nancy@latest; then
           echo "Nancy installed successfully"
         else
           echo "❌ Nancy installation failed, skipping vulnerability check"
@@ -134,7 +134,7 @@ jobs:
         
         # Install govulncheck with error handling
         echo "Installing govulncheck..."
-        if GOPROXY=proxy.golang.org,direct go install golang.org/x/vuln/cmd/govulncheck@latest; then
+        if go install golang.org/x/vuln/cmd/govulncheck@latest; then
           echo "govulncheck installed successfully"
         else
           echo "❌ govulncheck installation failed, skipping"
@@ -170,7 +170,7 @@ jobs:
         
         # Install ineffassign with error handling
         echo "Installing ineffassign..."
-        if GOPROXY=proxy.golang.org,direct go install github.com/gordonklaus/ineffassign@latest; then
+        if go install github.com/gordonklaus/ineffassign@latest; then
           echo "ineffassign installed successfully"
         else
           echo "❌ ineffassign installation failed, skipping"
@@ -199,7 +199,7 @@ jobs:
         
         # Install misspell with error handling
         echo "Installing misspell..."
-        if GOPROXY=proxy.golang.org,direct go install github.com/client9/misspell/cmd/misspell@latest; then
+        if go install github.com/client9/misspell/cmd/misspell@latest; then
           echo "misspell installed successfully"
         else
           echo "❌ misspell installation failed, skipping"
