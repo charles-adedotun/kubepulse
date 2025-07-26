@@ -49,13 +49,14 @@ jobs:
           wait_time=0
           
           while [ $wait_time -lt $max_wait ]; do
-            check_status=$(gh pr view $pr_number --repo ${{ github.repository }} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED") | .status' | head -1)
+            # Exclude wait-for-checks and merge decision workflows to avoid circular dependency
+            check_status=$(gh pr view $pr_number --repo ${{ github.repository }} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.status != "COMPLETED" and .name != "wait-for-checks" and .name != "merge-decision" and .name != "auto-merge") | .status' | head -1)
             
             if [ -z "$check_status" ]; then
-              failed_checks=$(gh pr view $pr_number --repo ${{ github.repository }} --json statusCheckRollup --jq '.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED") | .name')
+              failed_checks=$(gh pr view $pr_number --repo ${{ github.repository }} --json statusCheckRollup --jq '.statusCheckRollup[] | select((.conclusion == "FAILURE" or .conclusion == "CANCELLED") and .name != "wait-for-checks" and .name != "merge-decision" and .name != "auto-merge") | .name')
               
               if [ -z "$failed_checks" ]; then
-                echo "All checks passed!"
+                echo "All relevant checks passed!"
                 echo "checks_passed=true" >> $GITHUB_OUTPUT
                 exit 0
               else
