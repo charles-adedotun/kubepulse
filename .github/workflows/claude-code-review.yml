@@ -128,4 +128,3 @@ jobs:
           path: /tmp/review_analysis.md
           retention-days: 7
           if-no-files-found: warn
-EOF < /dev/null
