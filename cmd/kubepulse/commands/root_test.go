@@ -73,7 +73,7 @@ func TestRootCommand_Help(t *testing.T) {
 	originalArgs := rootCmd.Flag("help")
 	defer func() {
 		if originalArgs != nil {
-			rootCmd.Flags().Set("help", originalArgs.Value.String())
+			_ = rootCmd.Flags().Set("help", originalArgs.Value.String())
 		}
 	}()
 

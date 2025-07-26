@@ -112,7 +112,7 @@ export function useWebSocket() {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [connect])
+  }, [connect, attemptReconnect])
 
   return { data, connectionStatus }
 }

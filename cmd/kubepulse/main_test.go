@@ -131,7 +131,7 @@ func TestMain_WithTimeout(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		// Kill the process if it's taking too long
 		if cmd.Process != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
 		t.Error("Command took too long to execute")
 	}

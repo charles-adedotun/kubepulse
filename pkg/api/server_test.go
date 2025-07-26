@@ -155,7 +155,7 @@ func TestCorsMiddleware_Disabled(t *testing.T) {
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test"))
+		_, _ = w.Write([]byte("test"))
 	})
 
 	handler := server.corsMiddleware(testHandler)
@@ -184,7 +184,7 @@ func TestCorsMiddleware_Enabled_Wildcard(t *testing.T) {
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test"))
+		_, _ = w.Write([]byte("test"))
 	})
 
 	handler := server.corsMiddleware(testHandler)

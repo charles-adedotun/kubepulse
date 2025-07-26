@@ -33,15 +33,13 @@ jobs:
         # Install gosec using go install (most reliable method)
         GOPROXY=proxy.golang.org,direct go install github.com/securego/gosec/v2/cmd/gosec@latest
         
-        # Ensure gosec is in PATH and export for subsequent steps
-        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-        export PATH=$(go env GOPATH)/bin:$PATH
+        # Verify installation and get the binary path
+        GOSEC_PATH=$(go env GOPATH)/bin/gosec
+        echo "Gosec binary path: $GOSEC_PATH"
+        ls -la $(go env GOPATH)/bin/ || echo "GOPATH bin directory not found"
         
-        # Verify gosec is available
-        which gosec || echo "⚠️ gosec not found in PATH"
-        
-        # Run gosec
-        if gosec -fmt sarif -out gosec-results.sarif ./...; then
+        # Run gosec with full path
+        if $GOSEC_PATH -fmt sarif -out gosec-results.sarif ./...; then
           echo "✅ Gosec scan completed successfully"
         else
           echo "⚠️ Gosec scan completed with issues"
