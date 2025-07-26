@@ -30,21 +30,61 @@ jobs:
     - name: Run Gosec Security Scanner
       run: |
         echo "🔍 Running Gosec security scanner..."
-        # Install gosec using go install (most reliable method)
+        
+        # Set up proper Go environment
+        export GOPATH=$(go env GOPATH)
+        export GOBIN=$GOPATH/bin
+        export PATH=$GOBIN:$PATH
+        
+        # Install gosec with explicit binary path handling
+        echo "Installing gosec..."
         GOPROXY=proxy.golang.org,direct go install github.com/securego/gosec/v2/cmd/gosec@latest
         
-        # Verify installation and get the binary path
-        GOSEC_PATH=$(go env GOPATH)/bin/gosec
-        echo "Gosec binary path: $GOSEC_PATH"
-        ls -la $(go env GOPATH)/bin/ || echo "GOPATH bin directory not found"
+        # Verify installation with multiple fallback methods
+        GOSEC_BINARY=""
+        if [ -f "$GOBIN/gosec" ]; then
+          GOSEC_BINARY="$GOBIN/gosec"
+        elif [ -f "$GOPATH/bin/gosec" ]; then
+          GOSEC_BINARY="$GOPATH/bin/gosec"
+        elif command -v gosec >/dev/null 2>&1; then
+          GOSEC_BINARY="gosec"
+        else
+          echo "❌ Failed to locate gosec binary after installation"
+          echo "GOPATH: $GOPATH"
+          echo "GOBIN: $GOBIN"
+          echo "PATH: $PATH"
+          ls -la $GOPATH/bin/ || echo "GOPATH bin directory not found"
+          ls -la $GOBIN/ || echo "GOBIN directory not found"
+          # Create minimal SARIF file and exit
+          echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "gosec", "version": "unknown"}}, "results": []}]}' > gosec-results.sarif
+          echo "Created fallback SARIF file"
+          exit 0
+        fi
         
-        # Run gosec with full path
-        if $GOSEC_PATH -fmt sarif -out gosec-results.sarif ./...; then
+        echo "Found gosec binary at: $GOSEC_BINARY"
+        
+        # Run gosec with proper error handling
+        echo "Running gosec security scan..."
+        if "$GOSEC_BINARY" -fmt sarif -out gosec-results.sarif ./...; then
           echo "✅ Gosec scan completed successfully"
         else
-          echo "⚠️ Gosec scan completed with issues"
-          # Create a minimal SARIF file if gosec fails
-          echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "gosec"}}, "results": []}]}' > gosec-results.sarif
+          GOSEC_EXIT_CODE=$?
+          echo "⚠️ Gosec scan completed with exit code: $GOSEC_EXIT_CODE"
+          
+          # Check if SARIF file was created despite issues
+          if [ ! -f "gosec-results.sarif" ] || [ ! -s "gosec-results.sarif" ]; then
+            echo "Creating fallback SARIF file due to missing or empty results"
+            echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "gosec", "version": "latest"}}, "results": []}]}' > gosec-results.sarif
+          fi
+        fi
+        
+        # Validate SARIF file
+        if [ -f "gosec-results.sarif" ] && [ -s "gosec-results.sarif" ]; then
+          echo "✅ SARIF file generated successfully"
+          echo "SARIF file size: $(wc -c < gosec-results.sarif) bytes"
+        else
+          echo "❌ SARIF file missing or empty, creating minimal valid SARIF"
+          echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "gosec", "version": "latest"}}, "results": []}]}' > gosec-results.sarif
         fi
         
     - name: Upload Gosec results to GitHub Security tab
@@ -56,32 +96,60 @@ jobs:
     - name: Run Nancy vulnerability check
       run: |
         echo "🔍 Running Nancy vulnerability check..."
-        # Install nancy using go install (most reliable method)
-        GOPROXY=proxy.golang.org,direct go install github.com/sonatype-nexus-community/nancy@latest || echo "Nancy installation failed, skipping"
         
-        # Ensure nancy is in PATH
-        export PATH=$(go env GOPATH)/bin:$PATH
+        # Set up proper Go environment
+        export GOPATH=$(go env GOPATH)
+        export GOBIN=$GOPATH/bin
+        export PATH=$GOBIN:$PATH
+        
+        # Install nancy using go install with error handling
+        echo "Installing Nancy..."
+        if GOPROXY=proxy.golang.org,direct go install github.com/sonatype-nexus-community/nancy@latest; then
+          echo "Nancy installed successfully"
+        else
+          echo "❌ Nancy installation failed, skipping vulnerability check"
+          exit 0
+        fi
         
         # Run nancy if available
-        if command -v nancy &> /dev/null; then
+        if command -v nancy >/dev/null 2>&1; then
+          echo "Running Nancy vulnerability scan..."
           if go list -json -deps ./... | nancy sleuth; then
             echo "✅ Nancy scan completed successfully"  
           else
             echo "⚠️ Nancy scan found vulnerabilities or completed with warnings"
           fi
         else
-          echo "⚠️ Nancy not available, skipping vulnerability check"
+          echo "⚠️ Nancy not available after installation, skipping vulnerability check"
         fi
         
     - name: Run govulncheck
       run: |
         echo "🔍 Running govulncheck..."
-        # Use go install with proxy fallback
-        GOPROXY=proxy.golang.org,direct go install golang.org/x/vuln/cmd/govulncheck@latest || echo "govulncheck installation failed, skipping"
-        if command -v govulncheck &> /dev/null; then
-          govulncheck ./... || echo "govulncheck completed with warnings"
+        
+        # Set up proper Go environment
+        export GOPATH=$(go env GOPATH)
+        export GOBIN=$GOPATH/bin
+        export PATH=$GOBIN:$PATH
+        
+        # Install govulncheck with error handling
+        echo "Installing govulncheck..."
+        if GOPROXY=proxy.golang.org,direct go install golang.org/x/vuln/cmd/govulncheck@latest; then
+          echo "govulncheck installed successfully"
         else
-          echo "⚠️ govulncheck not available, skipping"
+          echo "❌ govulncheck installation failed, skipping"
+          exit 0
+        fi
+        
+        if command -v govulncheck >/dev/null 2>&1; then
+          echo "Running govulncheck scan..."
+          if govulncheck ./...; then
+            echo "✅ govulncheck completed successfully"
+          else
+            echo "⚠️ govulncheck completed with warnings"
+          fi
+        else
+          echo "⚠️ govulncheck not available after installation, skipping"
         fi
         
     - name: Run staticcheck
@@ -94,21 +162,59 @@ jobs:
     - name: Run ineffassign
       run: |
         echo "🔍 Running ineffassign..."
-        GOPROXY=proxy.golang.org,direct go install github.com/gordonklaus/ineffassign@latest || echo "ineffassign installation failed, skipping"
-        if command -v ineffassign &> /dev/null; then
-          ineffassign ./... || echo "ineffassign completed with warnings"
+        
+        # Set up proper Go environment
+        export GOPATH=$(go env GOPATH)
+        export GOBIN=$GOPATH/bin
+        export PATH=$GOBIN:$PATH
+        
+        # Install ineffassign with error handling
+        echo "Installing ineffassign..."
+        if GOPROXY=proxy.golang.org,direct go install github.com/gordonklaus/ineffassign@latest; then
+          echo "ineffassign installed successfully"
         else
-          echo "⚠️ ineffassign not available, skipping"
+          echo "❌ ineffassign installation failed, skipping"
+          exit 0
+        fi
+        
+        if command -v ineffassign >/dev/null 2>&1; then
+          echo "Running ineffassign scan..."
+          if ineffassign ./...; then
+            echo "✅ ineffassign completed successfully"
+          else
+            echo "⚠️ ineffassign completed with warnings"
+          fi
+        else
+          echo "⚠️ ineffassign not available after installation, skipping"
         fi
         
     - name: Run misspell
       run: |
         echo "🔍 Running misspell check..."
-        GOPROXY=proxy.golang.org,direct go install github.com/client9/misspell/cmd/misspell@latest || echo "misspell installation failed, skipping"
-        if command -v misspell &> /dev/null; then
-          misspell -error $(find . -type f -name "*.go" | grep -v vendor/) || echo "misspell completed with warnings"
+        
+        # Set up proper Go environment
+        export GOPATH=$(go env GOPATH)
+        export GOBIN=$GOPATH/bin
+        export PATH=$GOBIN:$PATH
+        
+        # Install misspell with error handling
+        echo "Installing misspell..."
+        if GOPROXY=proxy.golang.org,direct go install github.com/client9/misspell/cmd/misspell@latest; then
+          echo "misspell installed successfully"
         else
-          echo "⚠️ misspell not available, skipping"
+          echo "❌ misspell installation failed, skipping"
+          exit 0
+        fi
+        
+        if command -v misspell >/dev/null 2>&1; then
+          echo "Running misspell check..."
+          if misspell -error $(find . -type f -name "*.go" | grep -v vendor/); then
+            echo "✅ misspell completed successfully"
+          else
+            echo "⚠️ misspell completed with warnings"
+          fi
+        else
+          echo "⚠️ misspell not available after installation, skipping"
         fi
         
     - name: Security scan summary

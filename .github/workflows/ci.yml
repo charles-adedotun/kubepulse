@@ -295,34 +295,69 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
+      with:
+        # Fetch full history for benchmark comparison
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
 
-    - name: Run Baseline Benchmarks (main branch)
+    - name: Configure Git
       run: |
-        git fetch origin main
-        git checkout origin/main
-        go test -bench=. -benchmem -count=5 ./... > baseline_bench.txt
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@github.com"
 
     - name: Run Current Benchmarks (PR branch)
       run: |
-        git checkout ${{ github.head_ref }}
+        echo "Running benchmarks on current PR branch..."
+        echo "Current branch: $(git branch --show-current)"
+        echo "Current commit: $(git rev-parse HEAD)"
         go test -bench=. -benchmem -count=5 ./... > current_bench.txt
+        echo "Current benchmarks completed"
+
+    - name: Run Baseline Benchmarks (main branch)
+      run: |
+        echo "Switching to main branch for baseline benchmarks..."
+        git fetch origin main
+        git checkout origin/main
+        echo "Running baseline benchmarks on main branch..."
+        echo "Current commit: $(git rev-parse HEAD)"
+        go test -bench=. -benchmem -count=5 ./... > baseline_bench.txt
+        echo "Baseline benchmarks completed"
+        
+        # Switch back to PR branch for comparison
+        echo "Switching back to PR branch..."
+        git checkout -
 
     - name: Install benchcmp
       run: go install golang.org/x/tools/cmd/benchcmp@latest
 
     - name: Compare Benchmarks
       run: |
-        benchcmp baseline_bench.txt current_bench.txt > benchmark_comparison.txt || true
-        echo "## 📊 Performance Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        cat benchmark_comparison.txt >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "Comparing benchmark results..."
+        if [ -f baseline_bench.txt ] && [ -f current_bench.txt ]; then
+          benchcmp baseline_bench.txt current_bench.txt > benchmark_comparison.txt || echo "benchcmp completed with warnings"
+          
+          echo "## 📊 Performance Benchmark Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Comparing performance between main branch and current PR branch:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          if [ -s benchmark_comparison.txt ]; then
+            cat benchmark_comparison.txt >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No significant performance differences detected or comparison failed." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Missing benchmark files for comparison" >> $GITHUB_STEP_SUMMARY
+          echo "Baseline exists: $([ -f baseline_bench.txt ] && echo 'Yes' || echo 'No')" >> $GITHUB_STEP_SUMMARY
+          echo "Current exists: $([ -f current_bench.txt ] && echo 'Yes' || echo 'No')" >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Upload Benchmark Results
       uses: actions/upload-artifact@v4
