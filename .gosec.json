@@ -1,0 +1,26 @@
+{
+  "severity": "medium",
+  "confidence": "medium",
+  "rules": {
+    "G204": {
+      "severity": "high"
+    },
+    "G304": {
+      "severity": "high" 
+    },
+    "G306": {
+      "severity": "medium"
+    }
+  },
+  "exclude": {
+    "G204": [
+      "**/pkg/ai/client.go:241"
+    ]
+  },
+  "exclude-generated": true,
+  "exclude-dirs": [
+    "vendor",
+    ".git",
+    "node_modules"
+  ]
+}

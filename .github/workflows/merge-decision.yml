@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_run:
-    workflows: ["Claude Code Review", "CI"]
+    workflows: ["Claude Code Review", "CI", "Security Scan"]
     types: [completed]
 
 jobs:
