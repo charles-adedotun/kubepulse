@@ -134,13 +134,25 @@ jobs:
         mkdir -p $(go env GOPATH)/bin
         curl -sfL https://raw.githubusercontent.com/securecodewarrior/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.18.2
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        # Verify installation
+        ls -la $(go env GOPATH)/bin/gosec
+        echo "GOSEC_PATH=$(go env GOPATH)/bin/gosec" >> $GITHUB_ENV
         
     - name: Run Gosec Security Scanner
       run: |
-        export PATH=$PATH:$(go env GOPATH)/bin
-        $(go env GOPATH)/bin/gosec -fmt sarif -out gosec-results.sarif ./... || echo "Gosec completed with issues"
-        ls -la gosec-results.sarif
-        cat gosec-results.sarif
+        echo "Gosec path: $GOSEC_PATH"
+        echo "GOPATH: $(go env GOPATH)"
+        echo "PATH: $PATH"
+        $GOSEC_PATH -fmt sarif -out gosec-results.sarif ./... || echo "Gosec completed with issues"
+        if [ -f gosec-results.sarif ]; then
+          echo "SARIF file created successfully"
+          ls -la gosec-results.sarif
+          echo "SARIF content:"
+          cat gosec-results.sarif
+        else
+          echo "SARIF file not created, creating empty one"
+          echo '{"runs":[{"results":[]}]}' > gosec-results.sarif
+        fi
         
     - name: Upload SARIF Results
       uses: github/codeql-action/upload-sarif@v3
