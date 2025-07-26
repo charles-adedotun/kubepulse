@@ -131,12 +131,27 @@ jobs:
 
     - name: Install Gosec
       run: |
+        echo "GOPATH: $(go env GOPATH)"
         mkdir -p $(go env GOPATH)/bin
+        echo "Created bin directory, contents:"
+        ls -la $(go env GOPATH)/bin || echo "Bin directory doesn't exist yet"
+        
+        echo "Installing gosec..."
         curl -sfL https://raw.githubusercontent.com/securecodewarrior/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.18.2
-        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-        # Verify installation
-        ls -la $(go env GOPATH)/bin/gosec
-        echo "GOSEC_PATH=$(go env GOPATH)/bin/gosec" >> $GITHUB_ENV
+        
+        echo "Installation completed, checking contents:"
+        ls -la $(go env GOPATH)/bin
+        
+        if [ -f $(go env GOPATH)/bin/gosec ]; then
+          echo "Gosec installed successfully"
+          echo "GOSEC_PATH=$(go env GOPATH)/bin/gosec" >> $GITHUB_ENV
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        else
+          echo "Gosec installation failed, trying alternative installation method"
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          echo "GOSEC_PATH=$(go env GOPATH)/bin/gosec" >> $GITHUB_ENV
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        fi
         
     - name: Run Gosec Security Scanner
       run: |
