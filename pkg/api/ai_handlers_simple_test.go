@@ -23,11 +23,11 @@ func TestRemediationRequestStruct(t *testing.T) {
 		ActionID: "action-123",
 		DryRun:   true,
 	}
-	
+
 	if req.ActionID != "action-123" {
 		t.Errorf("expected ActionID %q, got %q", "action-123", req.ActionID)
 	}
-	
+
 	if !req.DryRun {
 		t.Error("expected DryRun to be true")
 	}
@@ -63,12 +63,12 @@ func TestAssistantQueryValidation(t *testing.T) {
 			expectedBody: "Query cannot be empty",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a simple server without dependencies
 			server := &Server{}
-			
+
 			var body bytes.Buffer
 			if tt.body != nil {
 				if str, ok := tt.body.(string); ok {
@@ -77,17 +77,17 @@ func TestAssistantQueryValidation(t *testing.T) {
 					_ = json.NewEncoder(&body).Encode(tt.body)
 				}
 			}
-			
+
 			req := httptest.NewRequest(tt.method, "/api/assistant/query", &body)
 			w := httptest.NewRecorder()
-			
+
 			// Call handler - it will fail at engine call but that's expected
 			server.HandleAssistantQuery(w, req)
-			
+
 			if w.Code != tt.expectedCode {
 				t.Errorf("expected status %d, got %d", tt.expectedCode, w.Code)
 			}
-			
+
 			if tt.expectedBody != "" && !strings.Contains(w.Body.String(), tt.expectedBody) {
 				t.Errorf("expected body to contain %q, got %q", tt.expectedBody, w.Body.String())
 			}
@@ -98,18 +98,18 @@ func TestAssistantQueryValidation(t *testing.T) {
 // TestRemediationSuggestionsValidation tests path parameter validation
 func TestRemediationSuggestionsValidation(t *testing.T) {
 	server := &Server{}
-	
+
 	// Test empty check name
 	req := httptest.NewRequest("GET", "/api/remediation//suggestions", nil)
 	// Set empty check name in URL vars (simulating mux behavior)
 	w := httptest.NewRecorder()
-	
+
 	server.HandleRemediationSuggestions(w, req)
-	
+
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
-	
+
 	if !strings.Contains(w.Body.String(), "Check name is required") {
 		t.Errorf("expected error message about check name, got %q", w.Body.String())
 	}
@@ -138,11 +138,11 @@ func TestExecuteRemediationValidation(t *testing.T) {
 			expectedBody: "Invalid request body",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := &Server{}
-			
+
 			var body bytes.Buffer
 			if tt.body != nil {
 				if str, ok := tt.body.(string); ok {
@@ -151,16 +151,16 @@ func TestExecuteRemediationValidation(t *testing.T) {
 					_ = json.NewEncoder(&body).Encode(tt.body)
 				}
 			}
-			
+
 			req := httptest.NewRequest(tt.method, "/api/remediation/execute", &body)
 			w := httptest.NewRecorder()
-			
+
 			server.HandleExecuteRemediation(w, req)
-			
+
 			if w.Code != tt.expectedCode {
 				t.Errorf("expected status %d, got %d", tt.expectedCode, w.Code)
 			}
-			
+
 			if tt.expectedBody != "" && !strings.Contains(w.Body.String(), tt.expectedBody) {
 				t.Errorf("expected body to contain %q, got %q", tt.expectedBody, w.Body.String())
 			}
@@ -183,7 +183,7 @@ func TestJSONStructures(t *testing.T) {
 			data: RemediationRequest{ActionID: "action-1", DryRun: true},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test JSON marshaling
@@ -191,7 +191,7 @@ func TestJSONStructures(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal %s: %v", tt.name, err)
 			}
-			
+
 			// Test JSON unmarshaling
 			switch tt.name {
 			case "QueryRequest":
@@ -220,7 +220,7 @@ func TestJSONStructures(t *testing.T) {
 // TestHTTPMethodValidation tests that handlers properly validate HTTP methods
 func TestHTTPMethodValidation(t *testing.T) {
 	server := &Server{}
-	
+
 	// Test that GET request to POST-only endpoints fail
 	postEndpoints := []struct {
 		name    string
@@ -230,16 +230,16 @@ func TestHTTPMethodValidation(t *testing.T) {
 		{"assistant query", "/api/assistant/query", server.HandleAssistantQuery},
 		{"execute remediation", "/api/remediation/execute", server.HandleExecuteRemediation},
 	}
-	
+
 	for _, endpoint := range postEndpoints {
 		t.Run(endpoint.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", endpoint.path, nil)
 			w := httptest.NewRecorder()
-			
+
 			endpoint.handler(w, req)
-			
+
 			if w.Code != http.StatusMethodNotAllowed {
-				t.Errorf("expected status %d for GET to %s, got %d", 
+				t.Errorf("expected status %d for GET to %s, got %d",
 					http.StatusMethodNotAllowed, endpoint.path, w.Code)
 			}
 		})
@@ -250,9 +250,9 @@ func TestHTTPMethodValidation(t *testing.T) {
 func TestHandlerExistence(t *testing.T) {
 	// We can't test successful responses without mocking the engine properly
 	// But we can verify handlers exist and handle nil engine gracefully
-	
+
 	server := &Server{}
-	
+
 	handlers := []struct {
 		name    string
 		method  string
@@ -262,21 +262,21 @@ func TestHandlerExistence(t *testing.T) {
 		{"predictive insights", "GET", "/api/insights/predictive", server.HandlePredictiveInsights},
 		{"smart alerts", "GET", "/api/alerts/smart", server.HandleSmartAlerts},
 	}
-	
+
 	for _, h := range handlers {
 		t.Run(h.name, func(t *testing.T) {
 			req := httptest.NewRequest(h.method, h.path, nil)
 			w := httptest.NewRecorder()
-			
+
 			// Should not panic - may get error due to nil engine but should handle it
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Handler %s panicked: %v", h.name, r)
 				}
 			}()
-			
+
 			h.handler(w, req)
-			
+
 			// Should not be 404 (handler not found)
 			if w.Code == http.StatusNotFound {
 				t.Errorf("Handler %s returned 404, handler may not exist", h.name)

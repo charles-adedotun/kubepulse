@@ -122,7 +122,7 @@ func TestValidateClaudePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &Client{claudePath: tt.path}
 			err := client.validateClaudePath()
-			
+
 			if tt.expectErr && err == nil {
 				t.Error("expected error but got none")
 			}
@@ -185,7 +185,7 @@ func TestSanitizePrompt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &Client{}
 			result := client.sanitizePrompt(tt.input)
-			
+
 			if result != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
@@ -274,11 +274,11 @@ func TestBuildPrompt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &Client{}
 			prompt, err := client.buildPrompt(tt.request)
-			
+
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			
+
 			for _, expected := range tt.contains {
 				if !strings.Contains(prompt, expected) {
 					t.Errorf("expected prompt to contain %q, but it didn't. Prompt: %s", expected, prompt)
@@ -290,45 +290,45 @@ func TestBuildPrompt(t *testing.T) {
 
 func TestAnalyzeDiagnostic(t *testing.T) {
 	client := NewClient(Config{TestMode: true})
-	
+
 	checkResult := &CheckResult{
 		Name:    "test-check",
 		Status:  HealthStatusUnhealthy,
 		Message: "Test failure",
 	}
-	
+
 	diagnosticContext := DiagnosticContext{
 		ClusterName:  "test-cluster",
 		ResourceType: "pod",
 		ResourceName: "test-pod",
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	
+
 	// In test mode, this should return a successful mock response
 	response, err := client.AnalyzeDiagnostic(ctx, checkResult, diagnosticContext)
-	
+
 	// We expect success in test mode with mock responses
 	if err != nil {
 		t.Errorf("unexpected error in test mode: %v", err)
 		return
 	}
-	
+
 	if response == nil {
 		t.Error("expected response in test mode, got nil")
 		return
 	}
-	
+
 	// Validate mock response structure
 	if response.Summary == "" {
 		t.Error("expected non-empty summary in mock response")
 	}
-	
+
 	if response.Confidence <= 0 {
 		t.Errorf("expected positive confidence in mock response, got %f", response.Confidence)
 	}
-	
+
 	if response.Severity == "" {
 		t.Error("expected non-empty severity in mock response")
 	}
@@ -336,45 +336,45 @@ func TestAnalyzeDiagnostic(t *testing.T) {
 
 func TestAnalyzeHealing(t *testing.T) {
 	client := NewClient(Config{TestMode: true})
-	
+
 	checkResult := &CheckResult{
 		Name:    "test-check",
 		Status:  HealthStatusUnhealthy,
 		Message: "Test failure",
 	}
-	
+
 	diagnosticContext := DiagnosticContext{
 		ClusterName:  "test-cluster",
 		ResourceType: "pod",
 		ResourceName: "test-pod",
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	
+
 	// In test mode, this should return a successful mock response
 	response, err := client.AnalyzeHealing(ctx, checkResult, diagnosticContext)
-	
+
 	// We expect success in test mode with mock responses
 	if err != nil {
 		t.Errorf("unexpected error in test mode: %v", err)
 		return
 	}
-	
+
 	if response == nil {
 		t.Error("expected response in test mode, got nil")
 		return
 	}
-	
+
 	// Validate mock response structure
 	if response.Summary == "" {
 		t.Error("expected non-empty summary in mock response")
 	}
-	
+
 	if response.Confidence <= 0 {
 		t.Errorf("expected positive confidence in mock response, got %f", response.Confidence)
 	}
-	
+
 	if response.Severity == "" {
 		t.Error("expected non-empty severity in mock response")
 	}
@@ -382,7 +382,7 @@ func TestAnalyzeHealing(t *testing.T) {
 
 func TestAnalyzeCluster(t *testing.T) {
 	client := NewClient(Config{TestMode: true})
-	
+
 	clusterHealth := &ClusterHealth{
 		ClusterName: "test-cluster",
 		Status:      HealthStatusHealthy,
@@ -396,33 +396,33 @@ func TestAnalyzeCluster(t *testing.T) {
 			},
 		},
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	
+
 	// In test mode, this should return a successful mock response
 	response, err := client.AnalyzeCluster(ctx, clusterHealth)
-	
+
 	// We expect success in test mode with mock responses
 	if err != nil {
 		t.Errorf("unexpected error in test mode: %v", err)
 		return
 	}
-	
+
 	if response == nil {
 		t.Error("expected response in test mode, got nil")
 		return
 	}
-	
+
 	// Validate mock response structure for InsightSummary
 	if response.OverallHealth == "" {
 		t.Error("expected non-empty overall health in mock response")
 	}
-	
+
 	if response.AIConfidence <= 0 {
 		t.Errorf("expected positive AI confidence in mock response, got %f", response.AIConfidence)
 	}
-	
+
 	if response.HealthScore <= 0 {
 		t.Errorf("expected positive health score in mock response, got %f", response.HealthScore)
 	}
@@ -430,7 +430,7 @@ func TestAnalyzeCluster(t *testing.T) {
 
 func TestCountCriticalIssues(t *testing.T) {
 	client := &Client{}
-	
+
 	tests := []struct {
 		name     string
 		health   *ClusterHealth
@@ -476,7 +476,7 @@ func TestCountCriticalIssues(t *testing.T) {
 			expected: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := client.countCriticalIssues(tt.health)
@@ -489,13 +489,13 @@ func TestCountCriticalIssues(t *testing.T) {
 
 func TestGetCircuitBreakerStats(t *testing.T) {
 	client := NewClient(Config{TestMode: true})
-	
+
 	stats := client.GetCircuitBreakerStats()
-	
+
 	if stats == nil {
 		t.Error("expected circuit breaker stats, got nil")
 	}
-	
+
 	// Verify it returns a map
 	if _, ok := stats["state"]; !ok {
 		t.Error("expected stats to contain 'state' key")
@@ -504,18 +504,18 @@ func TestGetCircuitBreakerStats(t *testing.T) {
 
 func TestResetCircuitBreaker(t *testing.T) {
 	client := NewClient(Config{TestMode: true})
-	
+
 	// This should not panic
 	client.ResetCircuitBreaker()
 }
 
 func TestGetDefaultSystemPrompt(t *testing.T) {
 	prompt := getDefaultSystemPrompt()
-	
+
 	if prompt == "" {
 		t.Error("expected non-empty system prompt")
 	}
-	
+
 	expectedContains := []string{
 		"Kubernetes",
 		"DevOps",
@@ -524,7 +524,7 @@ func TestGetDefaultSystemPrompt(t *testing.T) {
 		"JSON format",
 		"kubectl",
 	}
-	
+
 	for _, expected := range expectedContains {
 		if !strings.Contains(prompt, expected) {
 			t.Errorf("expected system prompt to contain %q", expected)
@@ -583,15 +583,15 @@ func TestInstructionTemplates(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			instructions := tt.fn()
-			
+
 			if instructions == "" {
 				t.Error("expected non-empty instructions")
 			}
-			
+
 			for _, expected := range tt.contains {
 				if !strings.Contains(instructions, expected) {
 					t.Errorf("expected instructions to contain %q", expected)
@@ -603,7 +603,7 @@ func TestInstructionTemplates(t *testing.T) {
 
 func TestAnalysisRequestValidation(t *testing.T) {
 	client := &Client{}
-	
+
 	tests := []struct {
 		name    string
 		request AnalysisRequest
@@ -643,11 +643,11 @@ func TestAnalysisRequestValidation(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			prompt, err := client.buildPrompt(tt.request)
-			
+
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
 			}

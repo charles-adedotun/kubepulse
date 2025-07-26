@@ -17,7 +17,7 @@ func TestMain_BuildAndExecute(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test basic help command
 	cmd := exec.Command("./kubepulse_test", "--help")
@@ -49,7 +49,7 @@ func TestMain_Version(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test version command
 	cmd := exec.Command("./kubepulse_test", "version")
@@ -79,7 +79,7 @@ func TestMain_InvalidCommand(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test invalid command
 	cmd := exec.Command("./kubepulse_test", "invalid-command-xyz")
@@ -110,7 +110,7 @@ func TestMain_WithTimeout(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test that the binary starts and can be terminated
 	cmd := exec.Command("./kubepulse_test", "--help")
@@ -144,7 +144,7 @@ func TestMain_EnvironmentVariables(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test with environment variables
 	cmd := exec.Command("./kubepulse_test", "--help")
@@ -184,7 +184,7 @@ func TestMainFunction_ErrorHandling(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test with an invalid kubeconfig to trigger an error path
 	cmd := exec.Command("./kubepulse_test", "monitor", "--kubeconfig", "/nonexistent/path")
@@ -222,7 +222,7 @@ func TestMainFunction_KlogInitialization(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test with klog flags
 	cmd := exec.Command("./kubepulse_test", "--help", "-v=1")
@@ -256,7 +256,7 @@ func TestMainFunction_Integration(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove("kubepulse_test")
+	defer func() { _ = os.Remove("kubepulse_test") }()
 
 	// Test basic functionality with multiple scenarios
 	tests := []struct {
@@ -360,7 +360,7 @@ func TestMainLogic_KlogInitialization(t *testing.T) {
 	if err := buildCmd.Run(); err != nil {
 		t.Fatalf("Main function should compile successfully: %v", err)
 	}
-	defer os.Remove("test_build")
+	defer func() { _ = os.Remove("test_build") }()
 
 	// The successful build confirms main() function structure is correct
 }

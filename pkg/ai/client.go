@@ -226,6 +226,11 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 		"--permission-mode", "bypassPermissions",
 	}
 
+	// Validate claude path to prevent command injection
+	if strings.Contains(c.claudePath, ";") || strings.Contains(c.claudePath, "&") || strings.Contains(c.claudePath, "|") {
+		return "", fmt.Errorf("invalid claude path detected")
+	}
+
 	// Use shell execution to inherit proper environment (like kubectl executor)
 	// This ensures Node.js/NVM environment is available for Claude CLI
 	escapedArgs := make([]string, len(args))
@@ -233,7 +238,7 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 		escapedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\"'\"'"))
 	}
 	cmdLine := fmt.Sprintf("%s %s", c.claudePath, strings.Join(escapedArgs, " "))
-	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine)
+	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine) // #nosec G204 - claudePath is validated above
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

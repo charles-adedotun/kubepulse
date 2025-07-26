@@ -17,7 +17,7 @@ func TestExecute(t *testing.T) {
 	// The main integration tests cover this functionality
 
 	// Just verify the function exists by ensuring it compiles
-	var _ func() error = Execute
+	var _ = Execute
 }
 
 func TestRootCommand_Basic(t *testing.T) {
@@ -186,9 +186,9 @@ func TestGlobalVariables(t *testing.T) {
 	}
 
 	// Test variable types
-	var _ string = cfgFile
-	var _ string = kubeconfig
-	var _ string = contextName
+	var _ = cfgFile
+	var _ = kubeconfig
+	var _ = contextName
 
 	// These variables should be declared (may be nil initially)
 	if k8sClient == nil {
@@ -271,8 +271,8 @@ func TestEnvironmentVariables(t *testing.T) {
 	viper.Reset()
 
 	// Set environment variable
-	os.Setenv("KUBECONFIG", "/env/kubeconfig")
-	defer os.Unsetenv("KUBECONFIG")
+	_ = os.Setenv("KUBECONFIG", "/env/kubeconfig")
+	defer func() { _ = os.Unsetenv("KUBECONFIG") }()
 
 	viper.AutomaticEnv()
 

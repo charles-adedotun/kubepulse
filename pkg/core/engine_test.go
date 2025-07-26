@@ -13,7 +13,7 @@ import (
 
 func TestNewEngine(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	
+
 	tests := []struct {
 		name   string
 		config EngineConfig
@@ -101,48 +101,48 @@ func TestNewEngine(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewEngine(tt.config)
-			
+
 			// Common verifications
 			if engine == nil {
 				t.Fatal("expected engine to be created")
 			}
-			
+
 			if engine.checks == nil {
 				t.Error("expected checks slice to be initialized")
 			}
-			
+
 			if engine.results == nil {
 				t.Error("expected results map to be initialized")
 			}
-			
+
 			if engine.alertManager == nil {
 				t.Error("expected alert manager to be initialized")
 			}
-			
+
 			if engine.anomalyEngine == nil {
 				t.Error("expected anomaly engine to be initialized")
 			}
-			
+
 			if engine.sloTracker == nil {
 				t.Error("expected SLO tracker to be initialized")
 			}
-			
+
 			if engine.errorHandler == nil {
 				t.Error("expected error handler to be initialized")
 			}
-			
+
 			if engine.ctx == nil {
 				t.Error("expected context to be initialized")
 			}
-			
+
 			if engine.cancel == nil {
 				t.Error("expected cancel function to be initialized")
 			}
-			
+
 			// Test-specific verifications
 			if err := tt.verify(engine); err != nil {
 				t.Fatal(err)
@@ -158,53 +158,53 @@ func TestAddRemoveCheck(t *testing.T) {
 		ContextName: "test-context",
 	}
 	engine := NewEngine(config)
-	
+
 	// Create mock health check
 	check := &mockHealthCheck{
 		name: "test-check",
 	}
-	
+
 	// Test adding check
 	engine.AddCheck(check)
-	
+
 	if len(engine.checks) != 1 {
 		t.Fatalf("expected 1 check, got %d", len(engine.checks))
 	}
-	
+
 	if engine.checks[0].Name() != "test-check" {
 		t.Errorf("expected check name %q, got %q", "test-check", engine.checks[0].Name())
 	}
-	
+
 	// Test adding another check
 	check2 := &mockHealthCheck{
 		name: "test-check-2",
 	}
 	engine.AddCheck(check2)
-	
+
 	if len(engine.checks) != 2 {
 		t.Fatalf("expected 2 checks, got %d", len(engine.checks))
 	}
-	
+
 	// Test removing check
 	err := engine.RemoveCheck("test-check")
 	if err != nil {
 		t.Fatalf("unexpected error removing check: %v", err)
 	}
-	
+
 	if len(engine.checks) != 1 {
 		t.Fatalf("expected 1 check after removal, got %d", len(engine.checks))
 	}
-	
+
 	if engine.checks[0].Name() != "test-check-2" {
 		t.Errorf("expected remaining check to be %q, got %q", "test-check-2", engine.checks[0].Name())
 	}
-	
+
 	// Test removing non-existent check
 	err = engine.RemoveCheck("non-existent")
 	if err == nil {
 		t.Error("expected error when removing non-existent check")
 	}
-	
+
 	expectedError := "check non-existent not found"
 	if err.Error() != expectedError {
 		t.Errorf("expected error %q, got %q", expectedError, err.Error())
@@ -213,7 +213,7 @@ func TestAddRemoveCheck(t *testing.T) {
 
 func TestCalculateScore(t *testing.T) {
 	engine := &Engine{}
-	
+
 	tests := []struct {
 		name     string
 		result   CheckResult
@@ -240,7 +240,7 @@ func TestCalculateScore(t *testing.T) {
 			expected: 0.25,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			score := engine.calculateScore(tt.result)
@@ -253,10 +253,10 @@ func TestCalculateScore(t *testing.T) {
 
 func TestGetWeight(t *testing.T) {
 	engine := &Engine{}
-	
+
 	result := CheckResult{Name: "test-check"}
 	weight := engine.getWeight(result)
-	
+
 	// Currently returns default weight of 1.0
 	if weight != 1.0 {
 		t.Errorf("expected default weight 1.0, got %f", weight)
@@ -265,7 +265,7 @@ func TestGetWeight(t *testing.T) {
 
 func TestGetSeverity(t *testing.T) {
 	engine := &Engine{}
-	
+
 	tests := []struct {
 		name     string
 		result   CheckResult
@@ -292,7 +292,7 @@ func TestGetSeverity(t *testing.T) {
 			expected: AlertSeverityInfo,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			severity := engine.getSeverity(tt.result)
@@ -310,46 +310,46 @@ func TestStoreAndGetResult(t *testing.T) {
 		ContextName: "test-context",
 	}
 	engine := NewEngine(config)
-	
+
 	result := CheckResult{
 		Name:    "test-check",
 		Status:  HealthStatusHealthy,
 		Message: "All good",
 	}
-	
+
 	// Test storing result
 	engine.storeResult(result)
-	
+
 	// Test getting specific result
 	stored, exists := engine.GetResult("test-check")
 	if !exists {
 		t.Fatal("expected result to exist")
 	}
-	
+
 	if stored.Name != "test-check" {
 		t.Errorf("expected name %q, got %q", "test-check", stored.Name)
 	}
-	
+
 	if stored.Status != HealthStatusHealthy {
 		t.Errorf("expected status %v, got %v", HealthStatusHealthy, stored.Status)
 	}
-	
+
 	if stored.Message != "All good" {
 		t.Errorf("expected message %q, got %q", "All good", stored.Message)
 	}
-	
+
 	// Test getting non-existent result
 	_, exists = engine.GetResult("non-existent")
 	if exists {
 		t.Error("expected result to not exist")
 	}
-	
+
 	// Test getting all results
 	allResults := engine.GetResults()
 	if len(allResults) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(allResults))
 	}
-	
+
 	if allResults["test-check"].Name != "test-check" {
 		t.Error("expected result to be stored in all results")
 	}
@@ -362,59 +362,59 @@ func TestGetClusterHealth(t *testing.T) {
 		ContextName: "test-context",
 	}
 	engine := NewEngine(config)
-	
+
 	// Store various check results
 	results := []CheckResult{
 		{Name: "healthy-check", Status: HealthStatusHealthy},
 		{Name: "degraded-check", Status: HealthStatusDegraded},
 		{Name: "unhealthy-check", Status: HealthStatusUnhealthy},
 	}
-	
+
 	for _, result := range results {
 		engine.storeResult(result)
 	}
-	
+
 	clusterHealth := engine.GetClusterHealth("test-cluster")
-	
+
 	// Test cluster name
 	if clusterHealth.ClusterName != "test-cluster" {
 		t.Errorf("expected cluster name %q, got %q", "test-cluster", clusterHealth.ClusterName)
 	}
-	
+
 	// Test overall status (should be degraded with mixed results)
 	if clusterHealth.Status != HealthStatusDegraded {
 		t.Errorf("expected status %v, got %v", HealthStatusDegraded, clusterHealth.Status)
 	}
-	
+
 	// Test check count
 	if len(clusterHealth.Checks) != 3 {
 		t.Fatalf("expected 3 checks, got %d", len(clusterHealth.Checks))
 	}
-	
+
 	// Test score calculation
 	if clusterHealth.Score.Raw <= 0 || clusterHealth.Score.Raw > 100 {
 		t.Errorf("expected raw score between 0-100, got %f", clusterHealth.Score.Raw)
 	}
-	
+
 	if clusterHealth.Score.Weighted <= 0 || clusterHealth.Score.Weighted > 100 {
 		t.Errorf("expected weighted score between 0-100, got %f", clusterHealth.Score.Weighted)
 	}
-	
+
 	// Test with all healthy checks
 	engine.results = make(map[string]CheckResult)
 	engine.storeResult(CheckResult{Name: "healthy1", Status: HealthStatusHealthy})
 	engine.storeResult(CheckResult{Name: "healthy2", Status: HealthStatusHealthy})
-	
+
 	healthyCluster := engine.GetClusterHealth("healthy-cluster")
 	if healthyCluster.Status != HealthStatusHealthy {
 		t.Errorf("expected healthy status, got %v", healthyCluster.Status)
 	}
-	
+
 	// Test with all unhealthy checks
 	engine.results = make(map[string]CheckResult)
 	engine.storeResult(CheckResult{Name: "unhealthy1", Status: HealthStatusUnhealthy})
 	engine.storeResult(CheckResult{Name: "unhealthy2", Status: HealthStatusUnhealthy})
-	
+
 	unhealthyCluster := engine.GetClusterHealth("unhealthy-cluster")
 	if unhealthyCluster.Status != HealthStatusUnhealthy {
 		t.Errorf("expected unhealthy status, got %v", unhealthyCluster.Status)
@@ -431,14 +431,14 @@ func TestCountCriticalIssues(t *testing.T) {
 			{Status: HealthStatusUnhealthy},
 		},
 	}
-	
+
 	count := 0
 	for _, check := range clusterHealth.Checks {
 		if check.Status == HealthStatusUnhealthy {
 			count++
 		}
 	}
-	
+
 	expected := 2 // Two unhealthy checks
 	if count != expected {
 		t.Errorf("expected %d critical issues, got %d", expected, count)
@@ -489,7 +489,7 @@ func TestHelperFunctions(t *testing.T) {
 			expected: "simplecheck",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.fn(tt.input)
@@ -534,15 +534,15 @@ func TestExtractErrorLogs(t *testing.T) {
 			expected: []string{},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logs := extractErrorLogs(tt.result)
-			
+
 			if len(logs) != len(tt.expected) {
 				t.Fatalf("expected %d logs, got %d", len(tt.expected), len(logs))
 			}
-			
+
 			for i, log := range logs {
 				if log != tt.expected[i] {
 					t.Errorf("expected log %d to be %q, got %q", i, tt.expected[i], log)
@@ -591,15 +591,15 @@ func TestExtractEvents(t *testing.T) {
 			expected: []string{},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			events := extractEvents(tt.result)
-			
+
 			if len(events) != len(tt.expected) {
 				t.Fatalf("expected %d events, got %d", len(tt.expected), len(events))
 			}
-			
+
 			for i, event := range events {
 				if event != tt.expected[i] {
 					t.Errorf("expected event %d to be %q, got %q", i, tt.expected[i], event)
@@ -616,7 +616,7 @@ func TestConvertToAICheckResult(t *testing.T) {
 		ContextName: "test-context",
 	}
 	engine := NewEngine(config)
-	
+
 	coreResult := CheckResult{
 		Name:    "test-check",
 		Status:  HealthStatusHealthy,
@@ -643,50 +643,50 @@ func TestConvertToAICheckResult(t *testing.T) {
 			},
 		},
 	}
-	
+
 	aiResult := engine.convertToAICheckResult(coreResult)
-	
+
 	// Test basic fields
 	if aiResult.Name != coreResult.Name {
 		t.Errorf("expected name %q, got %q", coreResult.Name, aiResult.Name)
 	}
-	
+
 	if aiResult.Status != ai.HealthStatus(coreResult.Status) {
 		t.Errorf("expected status %v, got %v", coreResult.Status, aiResult.Status)
 	}
-	
+
 	if aiResult.Message != coreResult.Message {
 		t.Errorf("expected message %q, got %q", coreResult.Message, aiResult.Message)
 	}
-	
+
 	// Test metrics conversion
 	if len(aiResult.Metrics) != 1 {
 		t.Fatalf("expected 1 metric, got %d", len(aiResult.Metrics))
 	}
-	
+
 	aiMetric := aiResult.Metrics[0]
 	coreMetric := coreResult.Metrics[0]
-	
+
 	if aiMetric.Name != coreMetric.Name {
 		t.Errorf("expected metric name %q, got %q", coreMetric.Name, aiMetric.Name)
 	}
-	
+
 	if aiMetric.Value != coreMetric.Value {
 		t.Errorf("expected metric value %f, got %f", coreMetric.Value, aiMetric.Value)
 	}
-	
+
 	// Test predictions conversion
 	if len(aiResult.Predictions) != 1 {
 		t.Fatalf("expected 1 prediction, got %d", len(aiResult.Predictions))
 	}
-	
+
 	aiPrediction := aiResult.Predictions[0]
 	corePrediction := coreResult.Predictions[0]
-	
+
 	if aiPrediction.Status != ai.HealthStatus(corePrediction.Status) {
 		t.Errorf("expected prediction status %v, got %v", corePrediction.Status, aiPrediction.Status)
 	}
-	
+
 	if aiPrediction.Probability != corePrediction.Probability {
 		t.Errorf("expected prediction probability %f, got %f", corePrediction.Probability, aiPrediction.Probability)
 	}
@@ -699,7 +699,7 @@ func TestConvertToAIClusterHealth(t *testing.T) {
 		ContextName: "test-context",
 	}
 	engine := NewEngine(config)
-	
+
 	coreHealth := ClusterHealth{
 		ClusterName: "test-cluster",
 		Status:      HealthStatusHealthy,
@@ -718,32 +718,32 @@ func TestConvertToAIClusterHealth(t *testing.T) {
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	aiHealth := engine.convertToAIClusterHealth(coreHealth)
-	
+
 	// Test basic fields
 	if aiHealth.ClusterName != coreHealth.ClusterName {
 		t.Errorf("expected cluster name %q, got %q", coreHealth.ClusterName, aiHealth.ClusterName)
 	}
-	
+
 	if aiHealth.Status != ai.HealthStatus(coreHealth.Status) {
 		t.Errorf("expected status %v, got %v", coreHealth.Status, aiHealth.Status)
 	}
-	
+
 	// Test score conversion
 	if aiHealth.Score.Raw != coreHealth.Score.Raw {
 		t.Errorf("expected raw score %f, got %f", coreHealth.Score.Raw, aiHealth.Score.Raw)
 	}
-	
+
 	if aiHealth.Score.Weighted != coreHealth.Score.Weighted {
 		t.Errorf("expected weighted score %f, got %f", coreHealth.Score.Weighted, aiHealth.Score.Weighted)
 	}
-	
+
 	// Test checks conversion
 	if len(aiHealth.Checks) != 1 {
 		t.Fatalf("expected 1 check, got %d", len(aiHealth.Checks))
 	}
-	
+
 	if aiHealth.Checks[0].Name != "test-check" {
 		t.Errorf("expected check name %q, got %q", "test-check", aiHealth.Checks[0].Name)
 	}

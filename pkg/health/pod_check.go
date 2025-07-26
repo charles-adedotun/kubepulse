@@ -172,7 +172,10 @@ func (p *PodHealthCheck) Configure(config map[string]interface{}) error {
 		p.namespace = v
 	}
 	if v, ok := config["restart_threshold"].(int); ok {
-		p.restartThreshold = int32(v)
+		// Validate range to prevent integer overflow
+		if v >= 0 && v <= int(^uint32(0)>>1) {
+			p.restartThreshold = int32(v)
+		}
 	}
 	if v, ok := config["exclude_namespaces"].([]string); ok {
 		p.excludeNamespaces = v
