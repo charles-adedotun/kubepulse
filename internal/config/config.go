@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -199,7 +200,12 @@ func LoadConfig(configPath string) (*Config, error) {
 
 // loadFromFile loads configuration from YAML file
 func loadFromFile(config *Config, path string) error {
-	data, err := os.ReadFile(path)
+	// Validate that the path doesn't contain directory traversal sequences
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("invalid path: directory traversal not allowed")
+	}
+
+	data, err := os.ReadFile(path) // #nosec G304 - path validation performed above
 	if err != nil {
 		return err
 	}
@@ -286,7 +292,7 @@ func SaveConfig(config *Config, path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
 
 // GetDefaultConfig returns a default configuration

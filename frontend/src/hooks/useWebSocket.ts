@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { config, wsUrl } from '@/config'
 
 export interface DashboardData {
@@ -26,7 +26,7 @@ export function useWebSocket() {
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const connect = () => {
+  const connect = useCallback(() => {
     const websocketUrl = wsUrl()
 
     try {
@@ -71,9 +71,9 @@ export function useWebSocket() {
       console.error('WebSocket connection failed:', error)
       setConnectionStatus('disconnected')
     }
-  }
+  }, [])
 
-  const attemptReconnect = () => {
+  const attemptReconnect = useCallback(() => {
     if (reconnectAttemptsRef.current < config.ui.maxReconnectAttempts) {
       reconnectAttemptsRef.current++
       console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${config.ui.maxReconnectAttempts})...`)
@@ -82,7 +82,7 @@ export function useWebSocket() {
         connect()
       }, config.ui.reconnectDelay)
     }
-  }
+  }, [connect])
 
   useEffect(() => {
     connect()
@@ -112,7 +112,7 @@ export function useWebSocket() {
       window.removeEventListener('focus', handleFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [connect, attemptReconnect])
 
   return { data, connectionStatus }
 }

@@ -12,6 +12,25 @@ import { useAIInsights } from '@/hooks/useAIInsights'
 import { useSystemTheme } from '@/hooks/useSystemTheme'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useState } from 'react'
+
+interface KubernetesContext {
+  name: string
+  cluster_name: string
+  namespace: string
+}
+
+interface NodeDetail {
+  ready: boolean
+  cpu_percent?: number
+  memory_percent?: number
+  [key: string]: unknown
+}
+
+interface ScoreData {
+  weighted: number
+  trend?: string
+  forecast?: string
+}
 import { config } from '@/config'
 import { useRuntimeConfig } from '@/hooks/useRuntimeConfig'
 
@@ -19,13 +38,13 @@ function App() {
   // Load runtime configuration from server
   useRuntimeConfig()
   
-  const [currentContext, setCurrentContext] = useState<any>(null)
+  const [currentContext, setCurrentContext] = useState<KubernetesContext | null>(null)
   const { data, connectionStatus } = useWebSocket()
   const { insights, loading: aiLoading, error: aiError } = useAIInsights()
   const [activeTab, setActiveTab] = useState('overview')
   useSystemTheme() // This hook handles applying dark class to document
 
-  const handleContextChange = (context: any) => {
+  const handleContextChange = (context: KubernetesContext) => {
     setCurrentContext(context)
     // The websocket connection will automatically receive updates
     // for the new context from the server
@@ -37,22 +56,22 @@ function App() {
       name: metric.name,
       value: metric.value,
       unit: metric.unit,
-      labels: (metric as any).labels,
-      timestamp: (metric as any).timestamp,
-      type: (metric as any).type,
+      labels: metric.labels,
+      timestamp: metric.timestamp,
+      type: metric.type,
       checkName: check.name
     })) || []
   ) || []
 
   // Extract node details for enhanced visualization
-  const nodeDetails = (data?.checks?.find(check => check.name === 'node-health') as any)?.details?.nodes || []
+  const nodeDetails: NodeDetail[] = data?.checks?.find(check => check.name === 'node-health')?.details?.nodes || []
   
   // Calculate cluster summary stats
   const clusterStats = {
     totalNodes: nodeDetails.length,
-    healthyNodes: nodeDetails.filter((node: any) => node.ready).length,
-    avgCpuUsage: nodeDetails.reduce((sum: number, node: any) => sum + (node.cpu_percent || 0), 0) / (nodeDetails.length || 1),
-    avgMemoryUsage: nodeDetails.reduce((sum: number, node: any) => sum + (node.memory_percent || 0), 0) / (nodeDetails.length || 1)
+    healthyNodes: nodeDetails.filter(node => node.ready).length,
+    avgCpuUsage: nodeDetails.reduce((sum, node) => sum + (node.cpu_percent || 0), 0) / (nodeDetails.length || 1),
+    avgMemoryUsage: nodeDetails.reduce((sum, node) => sum + (node.memory_percent || 0), 0) / (nodeDetails.length || 1)
   }
 
   return (
@@ -84,7 +103,7 @@ function App() {
           <StatusCard
             title="Health Score"
             value={data?.score ? `${Math.round(data.score.weighted)}%` : '--'}
-            description={`Trend: ${(data?.score as any)?.trend || 'Unknown'} | Forecast: ${(data?.score as any)?.forecast || 'Unknown'}`}
+            description={`Trend: ${(data?.score as ScoreData)?.trend || 'Unknown'} | Forecast: ${(data?.score as ScoreData)?.forecast || 'Unknown'}`}
             status="healthy"
           />
           <StatusCard
@@ -125,8 +144,8 @@ function App() {
                 name: check.name,
                 status: check.status,
                 message: check.message,
-                timestamp: (check as any).timestamp,
-                duration: (check as any).duration
+                timestamp: check.timestamp,
+                duration: check.duration
               })) || []}
             />
 

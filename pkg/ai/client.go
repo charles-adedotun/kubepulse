@@ -19,6 +19,7 @@ type Client struct {
 	maxTurns       int
 	timeout        time.Duration
 	systemPrompt   string
+	testMode       bool
 	circuitBreaker *CircuitBreaker
 	parser         *ResponseParser
 }
@@ -29,6 +30,7 @@ type Config struct {
 	MaxTurns     int
 	Timeout      time.Duration
 	SystemPrompt string
+	TestMode     bool // When true, returns mock responses instead of executing Claude CLI
 }
 
 // NewClient creates a new AI client
@@ -61,6 +63,7 @@ func NewClient(config Config) *Client {
 		maxTurns:       config.MaxTurns,
 		timeout:        config.Timeout,
 		systemPrompt:   config.SystemPrompt,
+		testMode:       config.TestMode,
 		circuitBreaker: circuitBreaker,
 		parser:         NewResponseParser(),
 	}
@@ -178,6 +181,33 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
+	// Return mock response in test mode
+	if c.testMode {
+		klog.Infof("AI: Test mode enabled, returning mock response")
+		return `{
+			"summary": "Mock analysis response for testing",
+			"diagnosis": "Mock diagnosis for testing",
+			"confidence": 0.8,
+			"severity": "medium",
+			"recommendations": [
+				{
+					"title": "Mock recommendation 1",
+					"description": "Mock description 1",
+					"priority": "high",
+					"references": []
+				}
+			],
+			"actions": [
+				{
+					"description": "Mock action 1",
+					"command": "kubectl get pods",
+					"priority": "high"
+				}
+			],
+			"context": {}
+		}`, nil
+	}
+
 	// Validate Claude path for security
 	if err := c.validateClaudePath(); err != nil {
 		return "", fmt.Errorf("invalid claude path: %w", err)
@@ -196,6 +226,11 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 		"--permission-mode", "bypassPermissions",
 	}
 
+	// Validate claude path to prevent command injection
+	if strings.Contains(c.claudePath, ";") || strings.Contains(c.claudePath, "&") || strings.Contains(c.claudePath, "|") {
+		return "", fmt.Errorf("invalid claude path detected")
+	}
+
 	// Use shell execution to inherit proper environment (like kubectl executor)
 	// This ensures Node.js/NVM environment is available for Claude CLI
 	escapedArgs := make([]string, len(args))
@@ -203,7 +238,7 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 		escapedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\"'\"'"))
 	}
 	cmdLine := fmt.Sprintf("%s %s", c.claudePath, strings.Join(escapedArgs, " "))
-	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine)
+	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine) // #nosec G204 - claudePath is validated above
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

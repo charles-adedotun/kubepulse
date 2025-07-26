@@ -28,9 +28,19 @@ interface PredictionData {
   }>
 }
 
+interface ClusterHealth {
+  score?: {
+    trend?: string
+  }
+}
+
+interface AIInsights {
+  [key: string]: unknown
+}
+
 interface PredictiveAnalyticsProps {
-  clusterHealth?: any
-  insights?: any
+  clusterHealth?: ClusterHealth
+  insights?: AIInsights
 }
 
 export function PredictiveAnalytics({ clusterHealth }: PredictiveAnalyticsProps) {

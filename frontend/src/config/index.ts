@@ -26,7 +26,7 @@ function getConfig(): Config {
   const env = import.meta.env || {}
   
   // Allow runtime configuration via window.__KUBEPULSE_CONFIG__
-  const runtimeConfig = (window as any).__KUBEPULSE_CONFIG__ || {}
+  const runtimeConfig = (window as Window & { __KUBEPULSE_CONFIG__?: Partial<Config> }).__KUBEPULSE_CONFIG__ || {}
   
   // Base URL can be set via env var or detected from current location
   const apiBaseUrl = runtimeConfig.apiBaseUrl || 

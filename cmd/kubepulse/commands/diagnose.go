@@ -296,7 +296,10 @@ func displayJSONOutput(diagnosis *ai.AnalysisResponse, healing *ai.AnalysisRespo
 
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(output)
+	if err := encoder.Encode(output); err != nil {
+		return fmt.Errorf("failed to encode JSON output: %w", err)
+	}
+	return nil
 }
 
 // getStatusIcon returns an icon for the health status

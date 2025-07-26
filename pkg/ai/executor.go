@@ -32,23 +32,20 @@ func (k *KubectlExecutor) Execute(ctx context.Context, command string) (string, 
 		return k.DryRun(ctx, command)
 	}
 
-	// Parse and validate command
-	if !strings.HasPrefix(command, "kubectl") {
-		return "", fmt.Errorf("only kubectl commands are supported")
-	}
-
-	// Add namespace if not present
-	if k.namespace != "" && !strings.Contains(command, "-n ") && !strings.Contains(command, "--namespace") {
-		command = fmt.Sprintf("%s -n %s", command, k.namespace)
+	// Parse and validate command to prevent injection
+	args, err := k.parseAndValidateCommand(command)
+	if err != nil {
+		return "", fmt.Errorf("command validation failed: %w", err)
 	}
 
 	// Execute with timeout
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	klog.V(2).Infof("Executing: %s", command)
+	klog.V(2).Infof("Executing kubectl with args: %v", args)
 
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	// Use exec.CommandContext with explicit args to prevent shell injection
+	cmd := exec.CommandContext(ctx, "kubectl", args...) // #nosec G204 - args are validated and sanitized above
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -56,6 +53,80 @@ func (k *KubectlExecutor) Execute(ctx context.Context, command string) (string, 
 	}
 
 	return string(output), nil
+}
+
+// parseAndValidateCommand parses a kubectl command string and validates arguments
+func (k *KubectlExecutor) parseAndValidateCommand(command string) ([]string, error) {
+	// Remove leading/trailing whitespace
+	command = strings.TrimSpace(command)
+
+	// Ensure command starts with kubectl
+	if !strings.HasPrefix(command, "kubectl") {
+		return nil, fmt.Errorf("only kubectl commands are supported")
+	}
+
+	// Split command into parts, handling quoted arguments safely
+	parts := strings.Fields(command)
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid kubectl command format")
+	}
+
+	// Remove "kubectl" from the parts (we'll add it back in Execute)
+	args := parts[1:]
+
+	// Validate each argument to prevent injection
+	for _, arg := range args {
+		if err := k.validateArgument(arg); err != nil {
+			return nil, fmt.Errorf("invalid argument '%s': %w", arg, err)
+		}
+	}
+
+	// Add namespace if not present and namespace is configured
+	if k.namespace != "" && !k.hasNamespaceArg(args) {
+		args = append([]string{"-n", k.namespace}, args...)
+	}
+
+	return args, nil
+}
+
+// validateArgument validates a single command argument
+func (k *KubectlExecutor) validateArgument(arg string) error {
+	// Check for shell injection patterns
+	dangerousPatterns := []string{
+		";", "&", "|", "$(", "`", ">", "<", "&&", "||", "\\",
+	}
+
+	for _, pattern := range dangerousPatterns {
+		if strings.Contains(arg, pattern) {
+			return fmt.Errorf("contains dangerous pattern: %s", pattern)
+		}
+	}
+
+	// Ensure argument doesn't contain null bytes or control characters
+	for _, char := range arg {
+		if char < 32 && char != 9 && char != 10 && char != 13 { // Allow tab, LF, CR
+			return fmt.Errorf("contains control character")
+		}
+	}
+
+	return nil
+}
+
+// hasNamespaceArg checks if namespace is already specified in args
+func (k *KubectlExecutor) hasNamespaceArg(args []string) bool {
+	for _, arg := range args {
+		if arg == "-n" || arg == "--namespace" {
+			return true
+		}
+		if strings.HasPrefix(arg, "--namespace=") {
+			return true
+		}
+		// Check for combined short flags like -ndefault
+		if strings.HasPrefix(arg, "-n") && len(arg) > 2 {
+			return true
+		}
+	}
+	return false
 }
 
 // DryRun simulates command execution

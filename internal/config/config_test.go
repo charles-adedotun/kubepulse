@@ -424,11 +424,11 @@ func TestEnvironmentVariableOverrides(t *testing.T) {
 	// This is a basic test to verify the structure supports env overrides
 
 	// Set test environment variables
-	os.Setenv("KUBEPULSE_SERVER_PORT", "9999")
-	os.Setenv("KUBEPULSE_UI_THEME", "light")
+	_ = os.Setenv("KUBEPULSE_SERVER_PORT", "9999")
+	_ = os.Setenv("KUBEPULSE_UI_THEME", "light")
 	defer func() {
-		os.Unsetenv("KUBEPULSE_SERVER_PORT")
-		os.Unsetenv("KUBEPULSE_UI_THEME")
+		_ = os.Unsetenv("KUBEPULSE_SERVER_PORT")
+		_ = os.Unsetenv("KUBEPULSE_UI_THEME")
 	}()
 
 	// Load config and verify environment support is available

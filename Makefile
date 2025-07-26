@@ -89,6 +89,11 @@ test-integration:
 	@echo "Running integration tests..."
 	go test -v -race -run Integration ./...
 
+.PHONY: benchmark
+benchmark:
+	@echo "Running benchmarks..."
+	go test -bench=. -benchmem -run='^$$' ./...
+
 .PHONY: coverage
 coverage: test
 	@echo "Generating coverage report..."
@@ -205,6 +210,7 @@ help:
 	@echo "  install        - Install the binary"
 	@echo "  test           - Run all tests with coverage"
 	@echo "  test-unit      - Run unit tests only"
+	@echo "  benchmark      - Run performance benchmarks"
 	@echo "  lint           - Run linters"
 	@echo "  fmt            - Format code"
 	@echo "  check          - Run all code quality checks"

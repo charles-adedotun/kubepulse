@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -424,14 +425,43 @@ func (s *Server) writeError(w http.ResponseWriter, statusCode int, message strin
 
 // ServeHTTP implements the http.Handler interface for SPA
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Get the absolute path to prevent directory traversal
-	path := filepath.Join(h.path, r.URL.Path)
+	// Clean and validate the URL path to prevent directory traversal
+	cleanPath := filepath.Clean(r.URL.Path)
+
+	// Prevent directory traversal by ensuring the path doesn't go outside the base directory
+	if strings.Contains(cleanPath, "..") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// Get the absolute path within the allowed directory
+	path := filepath.Join(h.path, cleanPath)
+
+	// Ensure the resolved path is still within the base directory
+	absBasePath, err := filepath.Abs(h.path)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	absRequestPath, err := filepath.Abs(path)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the requested path is within the allowed base path
+	if !strings.HasPrefix(absRequestPath, absBasePath) {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
 
 	// Check if file exists
 	fi, err := os.Stat(path)
 	if os.IsNotExist(err) || fi.IsDir() {
 		// File doesn't exist or is a directory, serve index.html
-		http.ServeFile(w, r, filepath.Join(h.path, "index.html"))
+		indexPath := filepath.Join(h.path, "index.html")
+		http.ServeFile(w, r, indexPath)
 		return
 	}
 

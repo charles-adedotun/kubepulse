@@ -25,10 +25,10 @@ export function useRuntimeConfig() {
             maxReconnectAttempts: runtimeConfig.maxReconnectAttempts || config.ui.maxReconnectAttempts,
             reconnectDelay: runtimeConfig.reconnectDelay || config.ui.reconnectDelay,
             theme: runtimeConfig.theme || config.ui.theme,
-            features: {
-              ...config.ui.features,
-              ...runtimeConfig.features,
-            },
+          },
+          features: {
+            ...config.features,
+            ...runtimeConfig.features,
           },
         })
         
