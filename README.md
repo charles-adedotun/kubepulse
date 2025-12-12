@@ -36,7 +36,7 @@ KubePulse solves this. It continuously monitors your Kubernetes cluster, detects
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/kubepulse.git
+git clone https://github.com/charles-adedotun/kubepulse.git
 cd kubepulse
 
 # Set up environment
