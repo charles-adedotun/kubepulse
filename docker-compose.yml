@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  kubepulse:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${HOME}/.kube/config:/home/kubepulse/.kube/config:ro
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - KUBEPULSE_LOG_LEVEL=${KUBEPULSE_LOG_LEVEL:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
