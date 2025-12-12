@@ -1,87 +1,80 @@
 # KubePulse
 
-Intelligent Kubernetes health monitoring with AI-powered diagnostics and auto-remediation.
+Kubernetes health monitoring with AI-powered diagnostics. Watches your cluster, detects anomalies, and uses Claude to explain issues in plain English.
 
-## The Problem
+## Quick Eval (2 min)
 
-You're on-call at 3 AM. A pod is crashlooping. `kubectl describe` shows cryptic errors. You're piecing together logs, events, and resource metrics across multiple commands. By the time you've diagnosed the issue, you've lost 45 minutes of sleep and your SLA is at risk.
-
-KubePulse solves this. It continuously monitors your Kubernetes cluster, detects anomalies, uses Claude AI to diagnose issues in plain English, and can automatically remediate common problems before they page you.
-
-## Features
-
-- **Real-time Health Monitoring**: Track pod status, node health, and cluster-wide metrics
-- **AI-Powered Diagnostics**: Claude analyzes events, logs, and metrics to explain what's actually wrong
-- **Auto-Remediation**: Configurable automated fixes for common issues (pod restarts, resource limits, scaling)
-- **Modern Dashboard**: React/TypeScript UI with real-time updates via WebSocket
-- **Alert Management**: Smart alerting that groups related issues and filters noise
-- **Historical Analysis**: Track patterns and recurring issues over time
-
-## Tech Stack
-
-- **Backend**: Go 1.21+, Kubernetes client-go
-- **Frontend**: React 18, TypeScript, TailwindCSS
-- **AI**: Claude API (Anthropic)
-- **Infrastructure**: Kubernetes 1.25+, Prometheus (optional)
-
-## Quick Start
-
-### Prerequisites
-
-- Kubernetes cluster (local or remote)
-- Valid kubeconfig with cluster access
-- Anthropic API key for Claude integration
-
-### Installation
+### Option A: From Source (Go 1.23 + Node 20)
 
 ```bash
-# Clone the repository
 git clone https://github.com/charles-adedotun/kubepulse.git
 cd kubepulse
 
-# Set up environment
-cp .env.example .env
-# Add your ANTHROPIC_API_KEY to .env
+# Initialize config
+make config-init
 
-# Run with Docker Compose
-docker-compose up -d
-
-# Or build from source
-make build
-./bin/kubepulse --kubeconfig ~/.kube/config
+# Run backend + frontend
+make dev
 ```
 
-The dashboard will be available at `http://localhost:8080`
+- Backend API: http://localhost:8080
+- Frontend dashboard: http://localhost:5173
 
-### Configuration
+### Option B: Docker Compose
 
-Edit `config.yaml` to customize:
+```bash
+git clone https://github.com/charles-adedotun/kubepulse.git
+cd kubepulse
 
-```yaml
-cluster:
-  kubeconfig: ~/.kube/config
-  context: production
+# Set your Anthropic API key (optional, for AI features)
+export ANTHROPIC_API_KEY=your-key-here
 
-monitoring:
-  interval: 30s
-  namespaces:
-    - default
-    - production
-    - staging
-
-ai:
-  provider: claude
-  model: claude-opus-4-5-20251101
-  auto_remediate: false  # Set to true to enable automatic fixes
-
-alerts:
-  slack_webhook: https://hooks.slack.com/...
-  pagerduty_key: your-key-here
+# Build and run
+docker-compose up --build
 ```
+
+Dashboard available at http://localhost:8080
+
+### What You'll See
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  KubePulse Dashboard                                        │
+├─────────────────────────────────────────────────────────────┤
+│  Cluster: minikube    Status: Healthy    Pods: 12/12       │
+│                                                             │
+│  Recent Events:                                             │
+│  [INFO]  pod/nginx-abc123 Running                          │
+│  [WARN]  pod/api-xyz789 High memory usage (85%)            │
+│  [AI]    "Memory pressure likely caused by connection      │
+│          pool exhaustion. Recommend scaling replicas."     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+- **Kubernetes cluster**: Kind, Minikube, or any K8s cluster
+- **Valid kubeconfig**: `~/.kube/config` with cluster access
+- **Anthropic API key**: Optional, enables AI diagnostics
+
+## Features
+
+- **Real-time Monitoring**: Pod, node, and service health via K8s informers
+- **AI Diagnostics**: Claude analyzes events/logs and explains issues in plain English
+- **Auto-Remediation**: Configurable automated fixes (disabled by default)
+- **WebSocket Dashboard**: React/TypeScript UI with live updates
+- **Smart Alerts**: Groups related issues, filters noise
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Backend | Go 1.23, client-go, Gorilla mux/websocket |
+| Frontend | React 19, TypeScript, Vite, TailwindCSS |
+| AI | Claude API (Anthropic) |
+| Infra | Kubernetes 1.25+, Docker |
 
 ## Architecture
-
-### Component Overview
 
 ```
 ┌─────────────────┐
@@ -93,23 +86,15 @@ alerts:
 │   Go Backend    │
 │                 │
 │ ┌─────────────┐ │
-│ │ Kubernetes  │ │ ← Watches cluster events
-│ │   Watcher   │ │
+│ │ K8s Watcher │ │ ← Informers watch pods/nodes/services
 │ └─────────────┘ │
-│                 │
 │ ┌─────────────┐ │
-│ │   Health    │ │ ← Analyzes metrics
+│ │   Health    │ │ ← Runs checks every 30s
 │ │  Analyzer   │ │
 │ └─────────────┘ │
-│                 │
 │ ┌─────────────┐ │
 │ │   Claude    │ │ ← AI diagnostics
 │ │ Integration │ │
-│ └─────────────┘ │
-│                 │
-│ ┌─────────────┐ │
-│ │ Remediation │ │ ← Applies fixes
-│ │   Engine    │ │
 │ └─────────────┘ │
 └────────┬────────┘
          │
@@ -119,60 +104,79 @@ alerts:
 └─────────────────┘
 ```
 
-### How It Works
+## Configuration
 
-1. **Watchers** continuously monitor Kubernetes resources using informers
-2. **Health Analyzer** evaluates events, metrics, and patterns against known issues
-3. **Claude Integration** receives context about problems and generates human-readable diagnostics
-4. **Remediation Engine** (when enabled) applies fixes based on Claude's recommendations
-5. **Frontend** displays real-time status and allows manual intervention
+Copy the example config and customize:
 
-### AI Diagnostic Flow
+```bash
+cp .kubepulse.yaml.example ~/.kubepulse.yaml
+```
 
-When an issue is detected:
+Key settings in `~/.kubepulse.yaml`:
 
-1. Gather context: pod logs, events, resource usage, recent deployments
-2. Send to Claude with system prompt optimized for Kubernetes troubleshooting
-3. Receive diagnostic with root cause, impact assessment, and recommended actions
-4. Present to user via UI or execute auto-remediation if configured
+```yaml
+kubernetes:
+  kubeconfig: ~/.kube/config
+  context: ""  # Use default context
+
+monitoring:
+  interval: 30s
+  enabled_checks:
+    - pod-health
+    - node-health
+    - service-health
+
+ai:
+  enabled: true
+  timeout: 120s
+
+server:
+  port: 8080
+```
 
 ## API Reference
 
 ### REST Endpoints
 
 ```
-GET  /api/v1/health            - Cluster health summary
-GET  /api/v1/namespaces        - List monitored namespaces
-GET  /api/v1/pods              - Pod status across namespaces
-GET  /api/v1/events            - Recent cluster events
-GET  /api/v1/diagnostics       - AI diagnostic history
-POST /api/v1/remediate         - Trigger manual remediation
+GET  /health              - Server health check
+GET  /api/v1/health       - Cluster health summary
+GET  /api/v1/namespaces   - List monitored namespaces
+GET  /api/v1/pods         - Pod status across namespaces
+GET  /api/v1/events       - Recent cluster events
+GET  /api/v1/diagnostics  - AI diagnostic history
+POST /api/v1/remediate    - Trigger manual remediation
 ```
 
 ### WebSocket
 
 ```
-WS /ws - Real-time updates for health status and events
+WS /ws - Real-time health updates and events
 ```
 
 ## Development
 
 ```bash
-# Backend development
-cd backend
-go mod download
-go run cmd/kubepulse/main.go
+# Full dev environment setup
+make setup
 
-# Frontend development
-cd frontend
-npm install
-npm run dev
+# Run backend only
+make run
+
+# Run frontend only (separate terminal)
+make frontend-dev
+
+# Run both (recommended)
+make dev
 
 # Run tests
 make test
 
 # Lint
 make lint
+
+# Build binary
+make build
 ```
 
 ## Deployment
@@ -180,35 +184,24 @@ make lint
 ### Kubernetes In-Cluster
 
 ```bash
-# Deploy to cluster (runs as a Deployment)
-kubectl apply -f deploy/kubernetes/
-
 # Create secret for API key
 kubectl create secret generic kubepulse-secrets \
   --from-literal=anthropic-api-key=your-key-here
+
+# Deploy
+kubectl apply -f deploy/kubernetes/base/
 ```
 
-### Helm Chart
+## CI/CD
 
-```bash
-helm install kubepulse ./charts/kubepulse \
-  --set apiKey=your-anthropic-key \
-  --set ingress.enabled=true \
-  --set ingress.host=kubepulse.example.com
-```
-
-## Future Roadmap
-
-- **Predictive Analytics**: Use historical data to predict failures before they happen
-- **Multi-Cluster Support**: Monitor and manage multiple Kubernetes clusters from a single dashboard
-- **Custom Remediation Playbooks**: Define your own automated responses to specific scenarios
-- **Cost Optimization**: AI-powered recommendations for right-sizing resources based on actual usage
-- **Integration Ecosystem**: Plugins for Datadog, New Relic, and other observability platforms
-- **Compliance Checks**: Automated scanning for security and compliance violations (PSPs, NetworkPolicies, etc.)
+This repo has GitHub Actions workflows for:
+- **core-ci.yml**: Tests, lint, security scan, build validation
+- **release.yml**: Multi-platform binary releases via GoReleaser
+- **claude-review.yml**: AI-powered PR reviews
 
 ## Contributing
 
-Pull requests welcome. For major changes, open an issue first to discuss what you'd like to change.
+Pull requests welcome. For major changes, open an issue first.
 
 ## License
 
