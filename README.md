@@ -1,5 +1,7 @@
 # KubePulse
 
+[![CI](https://github.com/charles-adedotun/kubepulse/actions/workflows/core-ci.yml/badge.svg)](https://github.com/charles-adedotun/kubepulse/actions/workflows/core-ci.yml)
+
 Kubernetes health monitoring with AI-powered diagnostics. Watches your cluster, detects anomalies, and uses Claude to explain issues in plain English.
 
 ## Quick Eval (2 min)
