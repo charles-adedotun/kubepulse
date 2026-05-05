@@ -6,8 +6,10 @@ resources:
 
 namePrefix: staging-
 
-commonLabels:
-  environment: staging
+labels:
+- includeSelectors: true
+  pairs:
+    environment: staging
 
 images:
 - name: ghcr.io/charles-adedotun/kubepulse
@@ -17,6 +19,6 @@ replicas:
 - name: kubepulse
   count: 2
 
-patchesStrategicMerge:
-- deployment-patch.yaml
-- service-patch.yaml
+patches:
+- path: deployment-patch.yaml
+- path: service-patch.yaml

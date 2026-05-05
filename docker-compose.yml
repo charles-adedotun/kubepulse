@@ -8,7 +8,6 @@ services:
     volumes:
       - ${HOME}/.kube/config:/home/kubepulse/.kube/config:ro
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - KUBEPULSE_LOG_LEVEL=${KUBEPULSE_LOG_LEVEL:-info}
     restart: unless-stopped
     healthcheck:
