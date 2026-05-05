@@ -17,7 +17,7 @@ KubePulse is a Go CLI and web dashboard for checking Kubernetes pod, node, and s
 
 ### From Source
 
-Requirements: Go 1.23, Node.js 20, and a kubeconfig with access to a Kubernetes cluster.
+Requirements: Go 1.25.9, Node.js 20, and a kubeconfig with access to a Kubernetes cluster.
 
 ```bash
 git clone https://github.com/charles-adedotun/kubepulse.git
