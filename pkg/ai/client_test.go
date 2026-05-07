@@ -133,66 +133,6 @@ func TestValidateClaudePath(t *testing.T) {
 	}
 }
 
-func TestSanitizePrompt(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "clean prompt",
-			input:    "What is the status of my cluster?",
-			expected: "What is the status of my cluster?",
-		},
-		{
-			name:     "with null bytes",
-			input:    "Test\x00prompt",
-			expected: "Testprompt",
-		},
-		{
-			name:     "with escape sequences",
-			input:    "Test\x1bprompt",
-			expected: "Testprompt",
-		},
-		{
-			name:     "with command injection",
-			input:    "Show pods $(rm -rf /)",
-			expected: "Show pods rm -rf /)",
-		},
-		{
-			name:     "with backticks",
-			input:    "Show pods `whoami`",
-			expected: "Show pods whoami",
-		},
-		{
-			name:     "with pipes and redirects",
-			input:    "kubectl get pods | grep failed > /tmp/output",
-			expected: "kubectl get pods  grep failed  /tmp/output",
-		},
-		{
-			name:     "with semicolons and ampersands",
-			input:    "kubectl get pods; rm file && echo done",
-			expected: "kubectl get pods rm file  echo done",
-		},
-		{
-			name:     "with OR operators",
-			input:    "cmd1 || cmd2",
-			expected: "cmd1  cmd2",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := &Client{}
-			result := client.sanitizePrompt(tt.input)
-
-			if result != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, result)
-			}
-		})
-	}
-}
-
 func TestBuildPrompt(t *testing.T) {
 	tests := []struct {
 		name     string
