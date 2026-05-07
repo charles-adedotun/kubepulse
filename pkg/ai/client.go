@@ -213,32 +213,21 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("invalid claude path: %w", err)
 	}
 
-	// Sanitize prompt to prevent injection attacks
-	sanitizedPrompt := c.sanitizePrompt(prompt)
-	if len(sanitizedPrompt) > 100000 { // Reasonable limit
-		return "", fmt.Errorf("prompt too long: %d characters", len(sanitizedPrompt))
+	if len(prompt) > 100000 { // Reasonable limit
+		return "", fmt.Errorf("prompt too long: %d characters", len(prompt))
 	}
 
 	args := []string{
-		"-p", sanitizedPrompt,
+		"-p", prompt,
 		"--max-turns", "1",
 		"--system-prompt", c.systemPrompt,
 		"--permission-mode", "bypassPermissions",
 	}
 
-	// Validate claude path to prevent command injection
-	if strings.Contains(c.claudePath, ";") || strings.Contains(c.claudePath, "&") || strings.Contains(c.claudePath, "|") {
-		return "", fmt.Errorf("invalid claude path detected")
-	}
-
-	// Use shell execution to inherit proper environment (like kubectl executor)
-	// This ensures Node.js/NVM environment is available for Claude CLI
-	escapedArgs := make([]string, len(args))
-	for i, arg := range args {
-		escapedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\"'\"'"))
-	}
-	cmdLine := fmt.Sprintf("%s %s", c.claudePath, strings.Join(escapedArgs, " "))
-	cmd := exec.CommandContext(ctx, "sh", "-c", cmdLine) // #nosec G204 - claudePath is validated above
+	// Use exec.Command with an argument slice so prompt content never reaches a shell parser.
+	// This is structurally injection-safe regardless of what kubectl output or K8s YAML the
+	// prompt contains (no sh -c, no shell quoting required).
+	cmd := exec.CommandContext(ctx, c.claudePath, args...) // #nosec G204 - claudePath is validated above
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -247,7 +236,7 @@ func (c *Client) runClaude(ctx context.Context, prompt string) (string, error) {
 	// Ensure proper environment inheritance for Node.js/Claude CLI
 	cmd.Env = os.Environ() // Inherit full environment from parent process
 
-	klog.Infof("AI: Executing Claude CLI analysis (prompt length: %d chars)", len(sanitizedPrompt))
+	klog.Infof("AI: Executing Claude CLI analysis (prompt length: %d chars)", len(prompt))
 
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -284,24 +273,6 @@ func (c *Client) validateClaudePath() error {
 	}
 
 	return fmt.Errorf("claude path not in allowlist: %s", c.claudePath)
-}
-
-// sanitizePrompt removes potentially dangerous content from prompts
-func (c *Client) sanitizePrompt(prompt string) string {
-	// Remove shell escape sequences and control characters
-	sanitized := strings.ReplaceAll(prompt, "\x00", "")
-	sanitized = strings.ReplaceAll(sanitized, "\x1b", "")
-
-	// Remove potential command injection patterns
-	dangerous := []string{
-		"$(", "`", ";", "&", "|", ">", "<", "&&", "||",
-	}
-
-	for _, pattern := range dangerous {
-		sanitized = strings.ReplaceAll(sanitized, pattern, "")
-	}
-
-	return sanitized
 }
 
 // GetCircuitBreakerStats returns circuit breaker statistics
