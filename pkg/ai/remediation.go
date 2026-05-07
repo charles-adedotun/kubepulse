@@ -272,9 +272,12 @@ Update your knowledge to:
 		Timestamp: time.Now(),
 	}
 
-	// Fire and forget - learning happens async
+	// Fire and forget - learning happens async, but keep a bounded context so
+	// the goroutine cannot run indefinitely after the caller returns.
+	learningCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)
 	go func() {
-		if _, err := r.client.Analyze(context.Background(), request); err != nil {
+		defer cancel()
+		if _, err := r.client.Analyze(learningCtx, request); err != nil {
 			klog.Errorf("Failed to learn from outcome: %v", err)
 		}
 	}()

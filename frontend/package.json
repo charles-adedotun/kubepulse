@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "echo \"No frontend unit tests configured; CI uses type-check, lint, build, and npm audit.\" && exit 0"
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",

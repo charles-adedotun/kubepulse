@@ -1,5 +1,5 @@
 # Build stage for Go backend
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.25.9-alpine AS go-builder
 
 # Install build dependencies
 RUN apk add --no-cache git make

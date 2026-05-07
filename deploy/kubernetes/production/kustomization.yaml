@@ -6,8 +6,10 @@ resources:
 
 namePrefix: prod-
 
-commonLabels:
-  environment: production
+labels:
+- includeSelectors: true
+  pairs:
+    environment: production
 
 images:
 - name: ghcr.io/charles-adedotun/kubepulse
@@ -17,6 +19,6 @@ replicas:
 - name: kubepulse
   count: 5
 
-patchesStrategicMerge:
-- deployment-patch.yaml
-- service-patch.yaml
+patches:
+- path: deployment-patch.yaml
+- path: service-patch.yaml

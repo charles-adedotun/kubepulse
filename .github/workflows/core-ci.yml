@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  GO_VERSION: '1.23'
+  GO_VERSION: '1.25.9'
   NODE_VERSION: '20'
 
 jobs:
@@ -35,21 +35,21 @@ jobs:
       run: |
         coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
         echo "Coverage: ${coverage}%"
-        if (( $(echo "$coverage < 30" | bc -l) )); then
-          echo "❌ Coverage ${coverage}% below minimum 30%"
+        if awk -v coverage="$coverage" 'BEGIN { exit !(coverage < 30) }'; then
+          echo "Coverage ${coverage}% below minimum 30%"
           exit 1
         fi
 
     - name: Run linting
       uses: golangci/golangci-lint-action@v6
       with:
-        version: latest
+        version: v1.64.8
         args: --timeout=5m
 
     - name: Check formatting
       run: |
         if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-          echo "❌ Code not properly formatted"
+          echo "Code not properly formatted"
           gofmt -s -l .
           exit 1
         fi
@@ -88,9 +88,9 @@ jobs:
       working-directory: ./frontend
       run: npm run lint
 
-    - name: Test
+    - name: Test placeholder
       working-directory: ./frontend
-      run: npm test -- --coverage --watchAll=false
+      run: npm test
 
     - name: Build
       working-directory: ./frontend
@@ -142,10 +142,32 @@ jobs:
         npm ci
         npm audit --audit-level=moderate
 
+  manifest-validation:
+    name: Kubernetes Manifest Validation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'v1.29.0'
+
+    - name: Render base manifests
+      run: kubectl kustomize deploy/kubernetes/base > /tmp/kubepulse-base.yaml
+
+    - name: Render staging overlay
+      run: kubectl kustomize deploy/kubernetes/staging > /tmp/kubepulse-staging.yaml
+
+    - name: Render production overlay
+      run: kubectl kustomize deploy/kubernetes/production > /tmp/kubepulse-production.yaml
+
   build-validation:
     name: Build Validation
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-tests]
+    needs: [backend-tests, frontend-tests, manifest-validation]
     
     steps:
     - name: Checkout
@@ -187,7 +209,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-tests, security-scan, build-validation]
+    needs: [backend-tests, frontend-tests, security-scan, manifest-validation, build-validation]
     if: always()
     
     steps:
@@ -198,14 +220,16 @@ jobs:
         echo "- Backend Tests: ${{ needs.backend-tests.result }}" >> $GITHUB_STEP_SUMMARY
         echo "- Frontend Tests: ${{ needs.frontend-tests.result }}" >> $GITHUB_STEP_SUMMARY
         echo "- Security Scan: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Kubernetes Manifest Validation: ${{ needs.manifest-validation.result }}" >> $GITHUB_STEP_SUMMARY
         echo "- Build Validation: ${{ needs.build-validation.result }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [[ "${{ needs.backend-tests.result }}" == "success" && 
               "${{ needs.frontend-tests.result }}" == "success" && 
               "${{ needs.security-scan.result }}" == "success" && 
+              "${{ needs.manifest-validation.result }}" == "success" &&
               "${{ needs.build-validation.result }}" == "success" ]]; then
-          echo "✅ **All checks passed!** Ready for review." >> $GITHUB_STEP_SUMMARY
+          echo "**All checks passed.** Ready for review." >> $GITHUB_STEP_SUMMARY
         else
-          echo "❌ **Some checks failed.** Please review and fix." >> $GITHUB_STEP_SUMMARY
+          echo "**Some checks failed.** Please review and fix." >> $GITHUB_STEP_SUMMARY
         fi
