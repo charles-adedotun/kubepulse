@@ -290,8 +290,8 @@ func (c *Client) buildPrompt(request AnalysisRequest) (string, error) {
 	var prompt strings.Builder
 
 	// Add context
-	prompt.WriteString(fmt.Sprintf("ANALYSIS REQUEST: %s\n\n", request.Type))
-	prompt.WriteString(fmt.Sprintf("CONTEXT: %s\n\n", request.Context))
+	fmt.Fprintf(&prompt, "ANALYSIS REQUEST: %s\n\n", request.Type)
+	fmt.Fprintf(&prompt, "CONTEXT: %s\n\n", request.Context)
 
 	// Add health check data if available
 	if request.HealthCheck != nil {
