@@ -1,13 +1,12 @@
 # GitHub Workflows
 
-This document summarizes the current GitHub Actions setup for KubePulse. It replaces the older workflow-focused README material with a shorter reference linked from the product README.
+This document summarizes the active GitHub Actions setup for KubePulse.
 
 ## Workflow Files
 
 | Workflow | File | Trigger | Purpose |
 | --- | --- | --- | --- |
 | Core CI | `.github/workflows/core-ci.yml` | Pushes and pull requests targeting `main` | Backend tests, frontend checks, security scans, manifest validation, binary build, Docker build. |
-| Claude Code Review | `.github/workflows/claude-review.yml` | Pull request open/update/reopen and issue comments containing `@claude` | Runs Anthropic's Claude Code GitHub Action with KubePulse-specific review instructions. |
 | Release | `.github/workflows/release.yml` | Tags matching `v*` | Runs GoReleaser for tagged releases. |
 
 ## Core CI
@@ -22,21 +21,6 @@ Jobs:
 - `manifest-validation`: renders base, staging, and production Kubernetes manifests with `kubectl kustomize`.
 - `build-validation`: builds the Linux binary, checks `--version` and `--help`, builds the Docker image, and checks the container `--version`.
 - `summary`: writes a GitHub Step Summary showing job results.
-
-## Claude Review
-
-`claude-review.yml` uses `anthropics/claude-code-action@v0.0.44`.
-
-It runs on:
-
-- Non-bot pull requests when opened, synchronized, or reopened.
-- Issue comments that contain `@claude`.
-
-Required secret:
-
-- `CLAUDE_CODE_OAUTH_TOKEN`
-
-The workflow grants read access to contents, write access to pull requests and issues, and `id-token: write`. The configured instructions ask Claude to focus on Go quality, Kubernetes API usage, RBAC and security, monitoring workload performance, and test coverage.
 
 ## Release
 
@@ -82,5 +66,6 @@ govulncheck ./...
 
 ## Notes
 
-- Older `.github/*.md` files may describe previous workflow names such as `minimal-ci.yml`, `claude.yml`, or `merge-decision.yml`. The active workflow files in this branch are `core-ci.yml`, `claude-review.yml`, and `release.yml`.
+- Claude Code review automation is intentionally disabled in this repository.
+- Older workflow names such as `minimal-ci.yml`, `claude.yml`, `claude-review.yml`, or `merge-decision.yml` are no longer active.
 - The frontend test script is intentionally a placeholder today; CI relies on type checking, linting, production build, and audit until component or end-to-end tests are added.
