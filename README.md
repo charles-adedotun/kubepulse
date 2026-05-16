@@ -187,7 +187,7 @@ npm run build
 npm audit --audit-level=moderate
 ```
 
-The GitHub Actions setup runs backend tests with race detection and coverage, frontend type/lint/build checks, dependency and security scans, Kubernetes manifest rendering, and binary/Docker build validation. Pull requests can also receive Claude Code review comments when `CLAUDE_CODE_OAUTH_TOKEN` is configured.
+The GitHub Actions setup runs backend tests with race detection and coverage, frontend type/lint/build checks, dependency and security scans, Kubernetes manifest rendering, and binary/Docker build validation.
 
 See [docs/github-workflows.md](docs/github-workflows.md) for the workflow details.
 
