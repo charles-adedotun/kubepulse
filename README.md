@@ -2,22 +2,29 @@
 
 [![CI](https://github.com/charles-adedotun/kubepulse/actions/workflows/core-ci.yml/badge.svg)](https://github.com/charles-adedotun/kubepulse/actions/workflows/core-ci.yml)
 
-KubePulse is a Go CLI and web dashboard for checking Kubernetes pod, node, and service health. It can optionally call a local Claude Code CLI for diagnostic summaries when AI features are enabled.
+KubePulse is a Kubernetes health and observability tool for quickly checking cluster status from a Go CLI or a web dashboard. It runs pod, node, and service health checks against the Kubernetes API, aggregates results into a traffic-light cluster view, and exposes the same data through REST and WebSocket endpoints.
 
-## What Works Today
+The repository also includes experimental AI-assisted diagnostics, predictive insights, and remediation helpers. Those paths depend on a local `claude` executable and should be treated as development-stage features rather than production automation.
 
-- CLI commands: `kubepulse monitor`, `kubepulse serve`, `kubepulse check`, and `kubepulse diagnose`.
-- Health checks for pods, nodes, and services using `client-go`.
-- REST API and WebSocket dashboard served by the Go backend.
-- React/TypeScript frontend built with Vite.
-- Kubernetes manifests under `deploy/kubernetes/base`, with staging and production kustomize overlays.
-- Optional AI diagnostics through the local `claude` executable. The current implementation does not call the Anthropic API directly.
+## What It Does
 
-## Quick Eval
+- Runs Kubernetes health checks from the CLI with `kubepulse monitor`, `kubepulse check`, and `kubepulse diagnose`.
+- Serves a Go API and React dashboard with live health updates over WebSocket.
+- Checks pod phases, readiness, pending failure reasons, and restart counts.
+- Checks node readiness and pressure conditions, with placeholder node resource usage until metrics API integration is implemented.
+- Checks services for ready endpoints.
+- Tracks health results, emits metrics from checks, and evaluates default alert rules through the in-process engine.
+- Provides Kubernetes deployment manifests under `deploy/kubernetes/base` with staging and production kustomize overlays.
 
-### From Source
+## Quickstart
 
-Requirements: Go 1.25.9, Node.js 20, and a kubeconfig with access to a Kubernetes cluster.
+Requirements:
+
+- Go 1.25.10
+- Node.js 20
+- A kubeconfig with access to the cluster you want to inspect
+
+Clone and run from source:
 
 ```bash
 git clone https://github.com/charles-adedotun/kubepulse.git
@@ -27,53 +34,69 @@ make config-init
 make dev
 ```
 
-- Backend API: `http://localhost:8080`
-- Frontend dev server: `http://localhost:5173`
+Development servers:
 
-### Docker Compose
+- Backend API and bundled dashboard: `http://localhost:8080`
+- Frontend Vite server: `http://localhost:5173`
+
+Build or install the CLI:
 
 ```bash
-git clone https://github.com/charles-adedotun/kubepulse.git
-cd kubepulse
+make build
+./bin/kubepulse --help
+
+make install
+kubepulse --help
+```
+
+Run with Docker Compose:
+
+```bash
 docker-compose up --build
 ```
 
-The container mounts `${HOME}/.kube/config` read-only and serves the dashboard on `http://localhost:8080`. AI diagnostics require the Claude Code CLI to be available in the runtime environment; the Docker image does not bundle it.
+The compose setup mounts `${HOME}/.kube/config` read-only and serves KubePulse on `http://localhost:8080`.
 
-## Architecture
+## Common Commands
 
+```bash
+# Run the default monitor once
+kubepulse monitor
+
+# Continuously monitor pods and nodes
+kubepulse monitor --watch --interval 30s
+
+# Limit checks to one namespace
+kubepulse monitor --namespace default
+
+# Run an individual check
+kubepulse check pod-health
+kubepulse check node-health
+
+# Start the dashboard and API
+kubepulse serve --port 8080
+
+# Run AI-assisted diagnostics for an unhealthy check
+kubepulse diagnose pod-health
 ```
-React dashboard
-  |
-  | REST + WebSocket
-  v
-Go API server
-  |
-  +-- monitoring engine
-  |     +-- pod health check
-  |     +-- node health check
-  |     +-- service health check
-  |
-  +-- optional Claude CLI diagnostics
-  |
-  v
-Kubernetes API
-```
+
+Use `--kubeconfig` and `--context` to override the default kubeconfig selection.
 
 ## Configuration
 
-Copy the example config and customize it:
+Create a local config file from the example:
 
 ```bash
 cp .kubepulse.yaml.example ~/.kubepulse.yaml
 ```
 
-Key settings:
+Important settings include:
 
 ```yaml
 kubernetes:
   kubeconfig: ~/.kube/config
   context: ""
+  namespaces: []
 
 monitoring:
   interval: 30s
@@ -82,23 +105,51 @@ monitoring:
     - node-health
     - service-health
 
-ai:
-  enabled: true
-  claude_path: "claude"
-  timeout: 120s
-
 server:
   port: 8080
+  enable_web: true
+
+ui:
+  refresh_interval: 10s
 ```
 
-Do not commit real webhook URLs, SMTP passwords, kubeconfigs, or Claude credentials. Keep secrets in local environment variables or Kubernetes Secrets.
+Keep webhook URLs, SMTP credentials, kubeconfigs, and Claude credentials out of commits. Use local environment variables or Kubernetes Secrets for sensitive values.
 
-## API Surface
+## Checks And Signals
 
-Current server routes include:
+| Check | What it inspects | Current notes |
+| --- | --- | --- |
+| `pod-health` | Pod phase, readiness, pending error reasons, restart counts, namespace exclusions | Defaults exclude `kube-system` and `kube-public`. |
+| `node-health` | Node readiness plus memory, disk, and PID pressure conditions | CPU and memory usage are currently placeholder values, not metrics API readings. |
+| `service-health` | Service endpoints with ready addresses | Services with no ready endpoints are marked degraded. |
+
+The monitor engine runs registered checks on an interval, stores the latest result for each check, evaluates alert rules, runs anomaly detection over emitted metrics, and can start AI analysis for degraded or unhealthy checks when AI is enabled.
+
+## Architecture
 
 ```text
-GET  /health
+React dashboard
+  |
+  | REST API and WebSocket
+  v
+Go API server
+  |
+  +-- monitoring engine
+  |     +-- pod-health
+  |     +-- node-health
+  |     +-- service-health
+  |
+  +-- alerts, metrics, SLO, and anomaly helpers
+  |
+  +-- optional Claude CLI diagnostics
+  |
+  v
+Kubernetes API
+```
+
+Primary API routes include:
+
+```text
 GET  /api/v1/health
 GET  /api/v1/health/cluster
 GET  /api/v1/health/checks
@@ -120,10 +171,14 @@ GET  /api/v1/ai/alerts/insights
 WS   /ws
 ```
 
-## Development Proof
+## Testing And CI
+
+Local checks:
 
 ```bash
 go test ./...
+go vet ./...
+
 cd frontend
 npm ci
 npm run type-check
@@ -132,30 +187,32 @@ npm run build
 npm audit --audit-level=moderate
 ```
 
-Frontend unit tests are not implemented yet; the current `npm test` script is a placeholder. CI should treat type-check, lint, build, and audit as frontend proof until real component tests are added.
+The GitHub Actions setup runs backend tests with race detection and coverage, frontend type/lint/build checks, dependency and security scans, Kubernetes manifest rendering, and binary/Docker build validation. Pull requests can also receive Claude Code review comments when `CLAUDE_CODE_OAUTH_TOKEN` is configured.
 
-## Deployment
+See [docs/github-workflows.md](docs/github-workflows.md) for the workflow details.
 
-Base manifests:
+## Deployment Manifests
 
-```bash
-kubectl apply -f deploy/kubernetes/base/
-```
-
-Kustomize overlays:
+Render or apply the Kubernetes manifests before customizing them for a shared cluster:
 
 ```bash
+kubectl kustomize deploy/kubernetes/base
 kubectl kustomize deploy/kubernetes/staging
 kubectl kustomize deploy/kubernetes/production
 ```
 
-Review the default ingress hostnames and RBAC before applying to a shared cluster.
+Review the generated RBAC, service account, image, hostnames, and namespace strategy before applying.
 
-## CI/CD
+## Status And Limitations
 
-- `.github/workflows/core-ci.yml`: Go tests, Go lint, frontend type/lint/build, frontend audit, Kubernetes manifest rendering, Docker build validation.
-- `.github/workflows/release.yml`: GoReleaser-based tagged releases.
-- `.github/workflows/claude-review.yml`: Optional Claude Code review workflow, enabled when `CLAUDE_CODE_OAUTH_TOKEN` is configured.
+KubePulse is actively evolving and should be evaluated before production use.
+
+- Frontend `npm test` is a placeholder; current frontend proof is type-check, lint, build, and audit.
+- `kubepulse monitor --output json` and `--output yaml` are declared but not implemented yet.
+- Node resource usage does not currently query the Kubernetes metrics API.
+- The alerts API currently returns example alert data rather than persisted alert history.
+- AI diagnostics require a local Claude Code CLI executable; the main app does not bundle Claude.
+- The Docker image does not include a kubeconfig or Claude CLI.
 
 ## License
 
