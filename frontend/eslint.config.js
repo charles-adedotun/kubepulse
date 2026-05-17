@@ -22,7 +22,7 @@ export default tseslint.config([
       globals: globals.browser,
     },
     rules: {
-      ...reactHooks.configs['recommended-latest'].rules,
+      ...reactHooks.configs.recommended.rules,
       ...reactRefresh.configs.vite.rules,
     },
   },
