@@ -1,5 +1,5 @@
 # Build stage for Go backend
-FROM golang:1.25.10-alpine AS go-builder
+FROM golang:1.26.3-alpine AS go-builder
 
 # Install build dependencies
 RUN apk add --no-cache git make
@@ -17,7 +17,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o kubepulse ./cmd/kubepulse
 
 # Build stage for React frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:26-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -32,7 +32,7 @@ COPY frontend/ .
 RUN npm run build
 
 # Final stage
-FROM alpine:3.19
+FROM alpine:3.23
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
