@@ -1,3 +1,5 @@
+@config "../tailwind.config.ts";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -130,7 +132,7 @@ body {
   
   /* Better focus styles */
   *:focus-visible {
-    @apply outline-none ring-2 ring-primary ring-opacity-50 ring-offset-2 ring-offset-background;
+    @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-background;
   }
   
   /* Subtle animations */
