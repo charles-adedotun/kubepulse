@@ -1,5 +1,5 @@
 # Build stage for Go backend
-FROM golang:1.26.3-alpine AS go-builder
+FROM golang:1.26.4-alpine AS go-builder
 
 # Install build dependencies
 RUN apk add --no-cache git make
@@ -32,7 +32,7 @@ COPY frontend/ .
 RUN npm run build
 
 # Final stage
-FROM alpine:3.23
+FROM alpine:3.24
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
