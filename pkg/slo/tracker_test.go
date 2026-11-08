@@ -140,3 +140,17 @@ func TestTracker_UpdateMetrics(t *testing.T) {
 		t.Error("expected non-nil status after updating metrics")
 	}
 }
+
+func TestTracker_PercentileUnsorted(t *testing.T) {
+	tracker := NewTracker()
+
+	values := []float64{500, 10, 20, 30, 40}
+	got := tracker.percentile(values, 95)
+	if got != 500 {
+		t.Errorf("expected p95 of unsorted slice to be 500, got %f", got)
+	}
+	// Ensure input slice was not mutated in place
+	if values[0] != 500 {
+		t.Errorf("expected original slice to remain unmodified, got first element %f", values[0])
+	}
+}

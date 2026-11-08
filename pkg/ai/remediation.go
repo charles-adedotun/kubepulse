@@ -150,9 +150,10 @@ Format as JSON array.`,
 // ExecuteRemediation executes a remediation action
 func (r *RemediationEngine) ExecuteRemediation(ctx context.Context, action RemediationAction, dryRun bool) (*RemediationRecord, error) {
 	record := RemediationRecord{
-		ID:        fmt.Sprintf("rem-%d", time.Now().Unix()),
-		Timestamp: time.Now(),
-		Action:    action,
+		ID:          fmt.Sprintf("rem-%d", time.Now().Unix()),
+		Timestamp:   time.Now(),
+		Action:      action,
+		RollbackCmd: action.Rollback,
 	}
 
 	// Safety validation
@@ -348,17 +349,13 @@ func (r *RemediationEngine) assessImpact(action SuggestedAction) string {
 }
 
 func (r *RemediationEngine) generateRollback(action RemediationAction) string {
-	// Generate inverse commands for common operations
+	// Generate safe inverse commands for common operations
 	for _, cmd := range action.Commands {
 		if strings.Contains(cmd, "scale") {
-			// Extract current scale and generate rollback
 			return strings.Replace(cmd, "replicas=", "replicas=<previous>", 1)
 		}
-		if strings.Contains(cmd, "set image") {
-			return strings.Replace(cmd, "=", "=<previous>", 1)
-		}
-		if strings.Contains(cmd, "apply") {
-			return strings.Replace(cmd, "apply", "delete", 1)
+		if strings.Contains(cmd, "set image") || strings.Contains(cmd, "apply") || strings.Contains(cmd, "patch") {
+			return "kubectl rollout undo deployment/<resource-name>"
 		}
 	}
 	return ""

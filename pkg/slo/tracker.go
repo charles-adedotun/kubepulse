@@ -2,6 +2,7 @@ package slo
 
 import (
 	"math"
+	"slices"
 	"sync"
 	"time"
 )
@@ -226,17 +227,22 @@ func (t *Tracker) calculateBurnRate(metrics []Metric) float64 {
 	return sum / float64(len(recent)-1)
 }
 
-// percentile calculates the given percentile of values
+// percentile calculates the given percentile of values using a sorted copy
 func (t *Tracker) percentile(values []float64, p float64) float64 {
 	if len(values) == 0 {
 		return 0.0
 	}
 
-	// Simple percentile calculation (should use proper sorting in production)
-	index := int(p/100.0*float64(len(values)-1) + 0.5)
-	if index >= len(values) {
-		index = len(values) - 1
+	sorted := slices.Clone(values)
+	slices.Sort(sorted)
+
+	index := int(p/100.0*float64(len(sorted)-1) + 0.5)
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(sorted) {
+		index = len(sorted) - 1
 	}
 
-	return values[index]
+	return sorted[index]
 }

@@ -6,6 +6,10 @@ import (
 	"time"
 
 	"github.com/kubepulse/kubepulse/pkg/core"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestNewNodeHealthCheck(t *testing.T) {
@@ -131,17 +135,38 @@ func TestNodeHealthCheck_Configure_InvalidTypes(t *testing.T) {
 func TestNodeHealthCheck_GetNodeResourceUsage(t *testing.T) {
 	check := NewNodeHealthCheck()
 
-	// Test the placeholder implementation
-	cpuMillis, memoryBytes := check.getNodeResourceUsage(context.TODO(), nil, "test-node")
-
-	expectedCPU := int64(2000)
-	expectedMemory := int64(4 * 1024 * 1024 * 1024) // 4GB
-
-	if cpuMillis != expectedCPU {
-		t.Errorf("expected CPU millis %d, got %d", expectedCPU, cpuMillis)
+	// Nil client should safely return 0, 0
+	if cpu, mem := check.getNodeResourceUsage(context.Background(), nil, "test-node"); cpu != 0 || mem != 0 {
+		t.Fatalf("expected 0, 0 for nil client, got %d, %d", cpu, mem)
 	}
 
-	if memoryBytes != expectedMemory {
-		t.Errorf("expected memory bytes %d, got %d", expectedMemory, memoryBytes)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-pod", Namespace: "default"},
+		Spec: corev1.PodSpec{
+			NodeName: "test-node",
+			Containers: []corev1.Container{
+				{
+					Name: "app",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{Phase: corev1.PodRunning},
+	}
+
+	client := fake.NewSimpleClientset(pod)
+	cpuMillis, memoryBytes := check.getNodeResourceUsage(context.Background(), client, "test-node")
+
+	if cpuMillis != 500 {
+		t.Errorf("expected CPU millis 500, got %d", cpuMillis)
+	}
+	wantMem := int64(256 * 1024 * 1024)
+	if memoryBytes != wantMem {
+		t.Errorf("expected memory bytes %d, got %d", wantMem, memoryBytes)
 	}
 }

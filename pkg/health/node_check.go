@@ -208,19 +208,34 @@ func (n *NodeHealthCheck) Criticality() core.Criticality {
 	return core.CriticalityCritical
 }
 
-// getNodeResourceUsage gets current resource usage for a node
-// In a real implementation, this would query the metrics API
+// getNodeResourceUsage aggregates active pod resource requests scheduled on nodeName.
 func (n *NodeHealthCheck) getNodeResourceUsage(ctx context.Context, client kubernetes.Interface, nodeName string) (cpuMillis int64, memoryBytes int64) {
-	// TODO: Implement actual metrics API query
-	// For now, return placeholder values
+	if client == nil || nodeName == "" {
+		return 0, 0
+	}
 
-	// This would typically query metrics.k8s.io/v1beta1
-	// Example:
-	// metricsClient := metricsv1beta1.NewForConfigOrDie(config)
-	// nodeMetrics, err := metricsClient.NodeMetricses().Get(ctx, nodeName, metav1.GetOptions{})
+	pods, err := client.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+		FieldSelector: "spec.nodeName=" + nodeName,
+	})
+	if err != nil {
+		return 0, 0
+	}
 
-	// Placeholder implementation - returns moderate usage
-	return 2000, 4 * 1024 * 1024 * 1024 // 2 CPU cores, 4GB memory
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+				cpuMillis += cpuReq.MilliValue()
+			}
+			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+				memoryBytes += memReq.Value()
+			}
+		}
+	}
+
+	return cpuMillis, memoryBytes
 }
 
 // Helper function to convert resource quantity to float64
