@@ -2,8 +2,6 @@ module github.com/kubepulse/kubepulse
 
 go 1.26.0
 
-toolchain go1.27.3
-
 require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
