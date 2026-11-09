@@ -1,6 +1,8 @@
 module github.com/kubepulse/kubepulse
 
-go 1.27.3
+go 1.26.0
+
+toolchain go1.27.3
 
 require (
 	github.com/gorilla/mux v1.8.1
