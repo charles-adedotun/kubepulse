@@ -451,14 +451,14 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if the requested path is within the allowed base path
-	if !strings.HasPrefix(absRequestPath, absBasePath) {
+	if absRequestPath != absBasePath && !strings.HasPrefix(absRequestPath, absBasePath+string(filepath.Separator)) {
 		http.Error(w, "Access denied", http.StatusForbidden)
 		return
 	}
 
 	// Check if file exists
-	fi, err := os.Stat(path)
-	if os.IsNotExist(err) || fi.IsDir() {
+	fi, err := os.Stat(absRequestPath) // #nosec G703 - path is validated to be within absBasePath above
+	if os.IsNotExist(err) || (err == nil && fi.IsDir()) {
 		// File doesn't exist or is a directory, serve index.html
 		indexPath := filepath.Join(h.path, "index.html")
 		http.ServeFile(w, r, indexPath)
